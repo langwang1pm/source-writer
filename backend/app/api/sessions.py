@@ -1,0 +1,83 @@
+
+from __future__ import annotations
+
+from datetime import datetime, timezone
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import select, func
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.database import get_db
+from app.models.session import Session
+from app.models.workspace import Workspace
+from app.schemas.session import (
+    SessionCreate, SessionResponse, SessionListResponse,
+)
+
+router = APIRouter(prefix="/api/v1/sessions", tags=["Sessions"])
+
+
+@router.post("", response_model=SessionResponse, status_code=201)
+async def create_session(body: SessionCreate, db: AsyncSession = Depends(get_db)):
+    ws = await db.get(Workspace, body.workspace_id)
+    if not ws or ws.deleted_at is not None:
+        raise HTTPException(404, detail="Workspace not found")
+    session = Session(workspace_id=body.workspace_id)
+    db.add(session)
+    await db.commit()
+    await db.refresh(session)
+    return session
+
+
+@router.get("", response_model=SessionListResponse)
+async def list_sessions(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    workspace_id: UUID | None = Query(None),
+    db: AsyncSession = Depends(get_db),
+):
+    q = select(Session).where(Session.deleted_at.is_(None))
+    if workspace_id:
+        q = q.where(Session.workspace_id == workspace_id)
+    count_q = select(func.count()).select_from(q.subquery())
+    total = (await db.execute(count_q)).scalar()
+    result = await db.execute(
+        q.order_by(Session.updated_at.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
+    items = result.scalars().all()
+    return SessionListResponse(
+        items=items, total=total, page=page, page_size=page_size,
+        total_pages=(total + page_size - 1) // page_size,
+    )
+
+
+@router.get("/{session_id}", response_model=SessionResponse)
+async def get_session(session_id: UUID, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(
+        select(Session).where(
+            Session.id == session_id,
+            Session.deleted_at.is_(None),
+        )
+    )
+    session = result.scalar_one_or_none()
+    if not session:
+        raise HTTPException(404, detail="Session not found")
+    return session
+
+
+@router.delete("/{session_id}", status_code=204)
+async def delete_session(session_id: UUID, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(
+        select(Session).where(
+            Session.id == session_id,
+            Session.deleted_at.is_(None),
+        )
+    )
+    session = result.scalar_one_or_none()
+    if not session:
+        raise HTTPException(404, detail="Session not found")
+    session.deleted_at = datetime.now(timezone.utc)
+    await db.commit()
