@@ -1,12 +1,11 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useParams, Link } from "react-router-dom";
-import { Plus, MessageSquare, FileText, ExternalLink } from "lucide-react";
+import { useParams } from "react-router-dom";
 import { sessions, messages, messageBlocks, responseDocs } from "../api/client";
 import { useSSE } from "../hooks/useSSE";
 import MessageCard from "../components/chat/MessageCard";
 import MessageInput from "../components/chat/MessageInput";
-import type { Session, ChatMessage, MessageBlock, SourceRef, ResponseDoc } from "../types";
+import type { ChatMessage, MessageBlock, SourceRef, ResponseDoc } from "../types";
 
 interface DisplayMessage {
   id: string;
@@ -21,28 +20,19 @@ export default function ChatPage() {
   const { workspaceId, sessionId } = useParams();
   const { isStreaming, startStream, stopStream } = useSSE();
 
-  const [sessionList, setSessionList] = useState<Session[]>([]);
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [streamBlocks, setStreamBlocks] = useState<MessageBlock[]>([]);
   const [streamingCard, setStreamingCard] = useState<number | null>(null);
   const [citationRefs, setCitationRefs] = useState<SourceRef[]>([]);
   const [showCitation, setShowCitation] = useState(false);
 
-  const activeSessionId = sessionId || sessionList[0]?.id;
   const chatEndRef = useRef<HTMLDivElement>(null);
-
-  // Load sessions
-  useEffect(() => {
-    sessions.list({ workspace_id: workspaceId }).then((res) => {
-      setSessionList(res.items || []);
-    });
-  }, [workspaceId]);
 
   // Load messages for active session
   useEffect(() => {
-    if (!activeSessionId) return;
-    loadMessages(activeSessionId);
-  }, [activeSessionId]);
+    if (!sessionId) return;
+    loadMessages(sessionId);
+  }, [sessionId]);
 
   const loadMessages = async (sid: string) => {
     try {
@@ -73,11 +63,12 @@ export default function ChatPage() {
   const handleSend = useCallback(async (content: string) => {
     if (!workspaceId || isStreaming) return;
 
-    let sid = activeSessionId;
+    let sid = sessionId;
     if (!sid) {
       const res = await sessions.create({ workspace_id: workspaceId });
       sid = res.id;
-      setSessionList((prev) => [res, ...prev]);
+      window.location.href = `/workspace/${workspaceId}/chat/${res.id}`;
+      return;
     }
 
     // Save user message
@@ -171,14 +162,14 @@ export default function ChatPage() {
       },
       onDone: () => {
         setStreamingCard(null);
-        loadMessages(sid);
+        if (sessionId) loadMessages(sessionId);
       },
       onError: (err) => {
         console.error("SSE error:", err);
         setStreamingCard(null);
       },
     });
-  }, [workspaceId, activeSessionId, isStreaming, startStream]);
+  }, [workspaceId, sessionId, isStreaming, startStream]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -186,72 +177,31 @@ export default function ChatPage() {
 
   return (
     <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
-      {/* Session list */}
-      <div style={{ width: 280, borderRight: "1px solid #e0e0e0", background: "#fafafa", display: "flex", flexDirection: "column" }}>
-        <div style={{ padding: "12px 16px", borderBottom: "1px solid #e0e0e0" }}>
-          <button
-            onClick={() => sessions.create({ workspace_id: workspaceId! }).then((s) => {
-              setSessionList((prev) => [s, ...prev]);
-              window.location.href = `/workspace/${workspaceId}/chat/${s.id}`;
-            })}
-            style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px dashed #ccc", background: "transparent", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#666" }}
-          >
-            <Plus size={14} />
-            新对话
-          </button>
-        </div>
-        <div style={{ flex: 1, overflow: "auto", padding: "8px 0" }}>
-          {sessionList.map((s) => (
-            <Link
-              key={s.id}
-              to={`/workspace/${workspaceId}/chat/${s.id}`}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                padding: "10px 16px",
-                fontSize: 13,
-                color: s.id === activeSessionId ? "#1a1a2e" : "#555",
-                background: s.id === activeSessionId ? "#e8e8f0" : "transparent",
-                textDecoration: "none",
-                borderLeft: s.id === activeSessionId ? "3px solid #1a1a2e" : "3px solid transparent",
-              }}
-            >
-              <MessageSquare size={14} />
-              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {s.title || "新对话"}
-              </span>
-            </Link>
-          ))}
-        </div>
-      </div>
-
       {/* Chat area */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-        <div style={{ flex: 1, overflow: "auto", background: "#f5f5f7" }}>
-          {messages.map((msg) => (
-            <MessageCard
-              key={msg.id}
-              role={msg.role}
-              content={msg.content}
-              blocks={msg.blocks}
-            />
-          ))}
-          {streamBlocks.length > 0 && (
-            <MessageCard
-              role="assistant"
-              blocks={streamBlocks}
-              streamingCard={streamingCard}
-            />
-          )}
-          {isStreaming && (
-            <div style={{ padding: "16px 20px 16px 72px", fontSize: 13, color: "#888" }}>
-              AI 正在生成...
+        {!sessionId ? (
+          <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "#999", fontSize: 14 }}>
+            从左侧选择一个对话，或创建新对话
+          </div>
+        ) : (
+          <>
+            <div style={{ flex: 1, overflow: "auto", background: "#f5f5f7" }}>
+              {messages.map((msg) => (
+                <MessageCard key={msg.id} role={msg.role} content={msg.content} blocks={msg.blocks} />
+              ))}
+              {streamBlocks.length > 0 && (
+                <MessageCard role="assistant" blocks={streamBlocks} streamingCard={streamingCard} />
+              )}
+              {isStreaming && (
+                <div style={{ padding: "16px 20px 16px 72px", fontSize: 13, color: "#888" }}>
+                  AI 正在生成...
+                </div>
+              )}
+              <div ref={chatEndRef} />
             </div>
-          )}
-          <div ref={chatEndRef} />
-        </div>
-        <MessageInput onSend={handleSend} disabled={isStreaming} />
+            <MessageInput onSend={handleSend} disabled={isStreaming} />
+          </>
+        )}
       </div>
 
       {/* Citation panel */}
