@@ -1,0 +1,120 @@
+
+import { useState, useEffect, useRef } from "react";
+import { useParams } from "react-router-dom";
+import { Upload, FileText, Trash2, Download } from "lucide-react";
+import { uploadedFiles } from "../api/client";
+import type { UploadedFile } from "../types";
+
+export default function KnowledgePage() {
+  const { workspaceId } = useParams();
+  const [files, setFiles] = useState<UploadedFile[]>([]);
+  const [loading, setLoading] = useState(true);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const loadFiles = async () => {
+    setLoading(true);
+    try {
+      const res = await uploadedFiles.list();
+      setFiles(res.items || []);
+    } catch {}
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    loadFiles();
+  }, [workspaceId]);
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append("file", file);
+    await uploadedFiles.upload(formData);
+    loadFiles();
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleDelete = async (id: string) => {
+    await uploadedFiles.delete(id);
+    loadFiles();
+  };
+
+  const statusColor = (s: string) => {
+    switch (s) {
+      case "available": return "#27ae60";
+      case "indexing": return "#f39c12";
+      case "error": return "#e74c3c";
+      default: return "#999";
+    }
+  };
+
+  const statusLabel = (s: string) => {
+    switch (s) {
+      case "available": return "可用";
+      case "indexing": return "索引中";
+      case "pending": return "等待中";
+      case "error": return "错误";
+      default: return s;
+    }
+  };
+
+  return (
+    <div style={{ padding: 24, flex: 1, overflow: "auto" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+        <h1 style={{ fontSize: 20, fontWeight: 600 }}>知识库</h1>
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 8, border: "none", background: "#1a1a2e", color: "#fff", cursor: "pointer", fontSize: 14 }}
+        >
+          <Upload size={16} />
+          上传文件
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          onChange={handleUpload}
+          accept=".pdf,.doc,.docx,.txt,.md"
+          style={{ display: "none" }}
+        />
+      </div>
+
+      {loading ? (
+        <div style={{ textAlign: "center", padding: 40, color: "#888" }}>加载中...</div>
+      ) : files.length === 0 ? (
+        <div style={{ textAlign: "center", padding: 60, color: "#999", border: "2px dashed #ddd", borderRadius: 12 }}>
+          <FileText size={48} style={{ opacity: 0.3, marginBottom: 12 }} />
+          <div>暂无文件，点击上方按钮上传</div>
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {files.map((f) => (
+            <div key={f.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", background: "#fff", borderRadius: 10, border: "1px solid #eee" }}>
+              <FileText size={20} color="#666" />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.file_name}</div>
+                <div style={{ fontSize: 12, color: "#888", display: "flex", gap: 12 }}>
+                  <span>{(f.file_size / 1024).toFixed(0)} KB</span>
+                  <span style={{ color: statusColor(f.status) }}>{statusLabel(f.status)}</span>
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 6 }}>
+                <a
+                  href={uploadedFiles.downloadUrl(f.id)}
+                  style={{ padding: 6, borderRadius: 6, border: "none", background: "transparent", cursor: "pointer", color: "#666" }}
+                >
+                  <Download size={16} />
+                </a>
+                <button
+                  onClick={() => handleDelete(f.id)}
+                  style={{ padding: 6, borderRadius: 6, border: "none", background: "transparent", cursor: "pointer", color: "#e74c3c" }}
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

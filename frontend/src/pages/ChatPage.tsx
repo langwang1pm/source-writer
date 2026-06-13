@@ -1,0 +1,271 @@
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useParams, Link } from "react-router-dom";
+import { Plus, MessageSquare, FileText, ExternalLink } from "lucide-react";
+import { sessions, messages, messageBlocks, responseDocs } from "../api/client";
+import { useSSE } from "../hooks/useSSE";
+import MessageCard from "../components/chat/MessageCard";
+import MessageInput from "../components/chat/MessageInput";
+import type { Session, ChatMessage, MessageBlock, SourceRef, ResponseDoc } from "../types";
+
+interface DisplayMessage {
+  id: string;
+  role: "user" | "assistant";
+  content?: string;
+  blocks?: MessageBlock[];
+  responseDoc?: ResponseDoc;
+  sourceRefs?: SourceRef[];
+}
+
+export default function ChatPage() {
+  const { workspaceId, sessionId } = useParams();
+  const { isStreaming, startStream, stopStream } = useSSE();
+
+  const [sessionList, setSessionList] = useState<Session[]>([]);
+  const [messages, setMessages] = useState<DisplayMessage[]>([]);
+  const [streamBlocks, setStreamBlocks] = useState<MessageBlock[]>([]);
+  const [streamingCard, setStreamingCard] = useState<number | null>(null);
+  const [citationRefs, setCitationRefs] = useState<SourceRef[]>([]);
+  const [showCitation, setShowCitation] = useState(false);
+
+  const activeSessionId = sessionId || sessionList[0]?.id;
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // Load sessions
+  useEffect(() => {
+    sessions.list({ workspace_id: workspaceId }).then((res) => {
+      setSessionList(res.items || []);
+    });
+  }, [workspaceId]);
+
+  // Load messages for active session
+  useEffect(() => {
+    if (!activeSessionId) return;
+    loadMessages(activeSessionId);
+  }, [activeSessionId]);
+
+  const loadMessages = async (sid: string) => {
+    try {
+      const res = await messages.list(sid);
+      const msgList: DisplayMessage[] = [];
+
+      for (const msg of (res.items || []) as ChatMessage[]) {
+        msgList.push({ id: msg.id, role: "user", content: msg.content });
+
+        const blocksRes = await messageBlocks.list(msg.id);
+        const blocks: MessageBlock[] = blocksRes || [];
+
+        const docsRes = await responseDocs.list({ session_id: sid });
+        const docs: ResponseDoc[] = docsRes.items || [];
+        const doc = docs.find((d) => d.chat_message_id === msg.id);
+
+        msgList.push({
+          id: `resp-${msg.id}`,
+          role: "assistant",
+          blocks,
+          responseDoc: doc,
+        });
+      }
+      setMessages(msgList);
+    } catch {}
+  };
+
+  const handleSend = useCallback(async (content: string) => {
+    if (!workspaceId || isStreaming) return;
+
+    let sid = activeSessionId;
+    if (!sid) {
+      const res = await sessions.create({ workspace_id: workspaceId });
+      sid = res.id;
+      setSessionList((prev) => [res, ...prev]);
+    }
+
+    // Save user message
+    const msgRes = await messages.send(sid, { content });
+    const userMsg: DisplayMessage = {
+      id: msgRes.id,
+      role: "user",
+      content: msgRes.content,
+    };
+    setMessages((prev) => [...prev, userMsg]);
+    setStreamBlocks([]);
+    setStreamingCard(null);
+
+    // Start SSE stream
+    const streamUrl = messages.streamUrl(sid, msgRes.id);
+    startStream(streamUrl, {
+      onThinkDelta: (cardOrdinal, delta) => {
+        setStreamBlocks((prev) => {
+          const existing = prev.find(
+            (b) => b.card_ordinal === cardOrdinal && b.block_type === "think"
+          );
+          if (existing) {
+            return prev.map((b) =>
+              b.card_ordinal === cardOrdinal && b.block_type === "think"
+                ? { ...b, content: b.content + delta }
+                : b
+            );
+          }
+          return [
+            ...prev,
+            {
+              id: `stream-${cardOrdinal}-think`,
+              session_id: sid,
+              user_message_id: msgRes.id,
+              card_ordinal: cardOrdinal,
+              block_type: "think",
+              content: delta,
+              ordinal: prev.length + 1,
+              created_at: new Date().toISOString(),
+            },
+          ];
+        });
+        setStreamingCard(cardOrdinal);
+      },
+      onAnswerDelta: (cardOrdinal, delta) => {
+        setStreamBlocks((prev) => {
+          const existing = prev.find(
+            (b) => b.card_ordinal === cardOrdinal && b.block_type === "answer"
+          );
+          if (existing) {
+            return prev.map((b) =>
+              b.card_ordinal === cardOrdinal && b.block_type === "answer"
+                ? { ...b, content: b.content + delta }
+                : b
+            );
+          }
+          return [
+            ...prev,
+            {
+              id: `stream-${cardOrdinal}-answer`,
+              session_id: sid,
+              user_message_id: msgRes.id,
+              card_ordinal: cardOrdinal,
+              block_type: "answer",
+              content: delta,
+              ordinal: prev.length + 1,
+              created_at: new Date().toISOString(),
+            },
+          ];
+        });
+        setStreamingCard(cardOrdinal);
+      },
+      onCitationUpdate: (cardOrdinal, refs) => {
+        setCitationRefs((prev) => [
+          ...prev,
+          ...refs.map((r: any) => ({
+            id: "",
+            response_doc_id: "",
+            message_block_id: null,
+            card_ordinal: cardOrdinal,
+            ordinal: r.ordinal,
+            source_name: r.source_name,
+            dify_document_id: null,
+            uploaded_file_id: null,
+            chunk_id: null,
+            snippet: null,
+            relevance_score: null,
+            char_position: r.char_position,
+          })),
+        ]);
+      },
+      onDone: () => {
+        setStreamingCard(null);
+        loadMessages(sid);
+      },
+      onError: (err) => {
+        console.error("SSE error:", err);
+        setStreamingCard(null);
+      },
+    });
+  }, [workspaceId, activeSessionId, isStreaming, startStream]);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, streamBlocks]);
+
+  return (
+    <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
+      {/* Session list */}
+      <div style={{ width: 280, borderRight: "1px solid #e0e0e0", background: "#fafafa", display: "flex", flexDirection: "column" }}>
+        <div style={{ padding: "12px 16px", borderBottom: "1px solid #e0e0e0" }}>
+          <button
+            onClick={() => sessions.create({ workspace_id: workspaceId! }).then((s) => {
+              setSessionList((prev) => [s, ...prev]);
+              window.location.href = `/workspace/${workspaceId}/chat/${s.id}`;
+            })}
+            style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px dashed #ccc", background: "transparent", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#666" }}
+          >
+            <Plus size={14} />
+            新对话
+          </button>
+        </div>
+        <div style={{ flex: 1, overflow: "auto", padding: "8px 0" }}>
+          {sessionList.map((s) => (
+            <Link
+              key={s.id}
+              to={`/workspace/${workspaceId}/chat/${s.id}`}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "10px 16px",
+                fontSize: 13,
+                color: s.id === activeSessionId ? "#1a1a2e" : "#555",
+                background: s.id === activeSessionId ? "#e8e8f0" : "transparent",
+                textDecoration: "none",
+                borderLeft: s.id === activeSessionId ? "3px solid #1a1a2e" : "3px solid transparent",
+              }}
+            >
+              <MessageSquare size={14} />
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {s.title || "新对话"}
+              </span>
+            </Link>
+          ))}
+        </div>
+      </div>
+
+      {/* Chat area */}
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        <div style={{ flex: 1, overflow: "auto", background: "#f5f5f7" }}>
+          {messages.map((msg) => (
+            <MessageCard
+              key={msg.id}
+              role={msg.role}
+              content={msg.content}
+              blocks={msg.blocks}
+            />
+          ))}
+          {streamBlocks.length > 0 && (
+            <MessageCard
+              role="assistant"
+              blocks={streamBlocks}
+              streamingCard={streamingCard}
+            />
+          )}
+          {isStreaming && (
+            <div style={{ padding: "16px 20px 16px 72px", fontSize: 13, color: "#888" }}>
+              AI 正在生成...
+            </div>
+          )}
+          <div ref={chatEndRef} />
+        </div>
+        <MessageInput onSend={handleSend} disabled={isStreaming} />
+      </div>
+
+      {/* Citation panel */}
+      {citationRefs.length > 0 && (
+        <div style={{ width: 300, borderLeft: "1px solid #e0e0e0", background: "#fafafa", padding: 12, overflow: "auto" }}>
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: "#333" }}>引用来源</div>
+          {citationRefs.map((ref, i) => (
+            <div key={i} style={{ fontSize: 12, padding: "8px 10px", marginBottom: 6, background: "#fff", borderRadius: 8, border: "1px solid #eee" }}>
+              <div style={{ fontWeight: 500, color: "#333", marginBottom: 2 }}>{ref.source_name}</div>
+              {ref.snippet && <div style={{ color: "#888", fontSize: 11 }}>{ref.snippet.slice(0, 100)}...</div>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
