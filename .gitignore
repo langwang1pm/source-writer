@@ -37,3 +37,6 @@ uploads/
 
 # Migration backups
 *.old.md
+
+# Project notes
+TodoList.md

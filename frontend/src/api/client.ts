@@ -38,8 +38,12 @@ export const taskTypes = {
     if (params?.active_only) q.set("active_only", "true");
     return request<any>(`/task-types?${q}`);
   },
-  create: (data: { name: string; description?: string }) =>
+  create: (data: { name: string; description?: string; is_active?: boolean }) =>
     request<any>("/task-types", { method: "POST", body: JSON.stringify(data) }),
+  update: (id: string, data: { name?: string; description?: string; is_active?: boolean }) =>
+    request<any>(`/task-types/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  delete: (id: string) =>
+    request<void>(`/task-types/${id}`, { method: "DELETE" }),
 };
 
 // === Workspaces ===
