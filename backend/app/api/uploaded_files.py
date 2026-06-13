@@ -1,16 +1,17 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.uploaded_file import UploadedFile
 from app.schemas.uploaded_file import (
-    UploadedFileResponse, UploadedFileListResponse,
+    UploadedFileResponse, UploadedFileListResponse, UploadedFileCreateResponse,
 )
 
 router = APIRouter(prefix="/api/v1/uploaded-files", tags=["Uploaded Files"])
@@ -43,6 +44,26 @@ async def list_uploaded_files(
     )
 
 
+@router.post("", response_model=UploadedFileCreateResponse, status_code=201)
+async def create_uploaded_file(
+    enterprise_id: UUID = Query(...),
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+):
+    from app.services.upload_svc import upload_file
+    try:
+        uploaded = await upload_file(db, file, enterprise_id)
+    except ValueError as e:
+        raise HTTPException(400, detail=str(e))
+    return UploadedFileCreateResponse(
+        id=uploaded.id,
+        file_name=uploaded.file_name,
+        file_size=uploaded.file_size,
+        status=uploaded.status,
+        created_at=uploaded.created_at,
+    )
+
+
 @router.get("/{file_id}", response_model=UploadedFileResponse)
 async def get_uploaded_file(file_id: UUID, db: AsyncSession = Depends(get_db)):
     result = await db.execute(
@@ -57,8 +78,9 @@ async def get_uploaded_file(file_id: UUID, db: AsyncSession = Depends(get_db)):
     return f
 
 
-@router.delete("/{file_id}", status_code=204)
-async def delete_uploaded_file(file_id: UUID, db: AsyncSession = Depends(get_db)):
+@router.get("/{file_id}/download")
+async def download_uploaded_file(file_id: UUID, db: AsyncSession = Depends(get_db)):
+    from fastapi.responses import FileResponse
     result = await db.execute(
         select(UploadedFile).where(
             UploadedFile.id == file_id,
@@ -68,6 +90,29 @@ async def delete_uploaded_file(file_id: UUID, db: AsyncSession = Depends(get_db)
     f = result.scalar_one_or_none()
     if not f:
         raise HTTPException(404, detail="File not found")
-    from datetime import datetime, timezone
-    f.deleted_at = datetime.now(timezone.utc)
-    await db.commit()
+    if not f.local_path:
+        raise HTTPException(404, detail="File not available on disk")
+    from app.config import settings
+    file_path = Path(settings.upload_dir) / f.local_path
+    if not file_path.exists():
+        raise HTTPException(404, detail="File not found on disk")
+    return FileResponse(
+        path=str(file_path),
+        filename=f.file_name,
+        media_type=f.mime_type or "application/octet-stream",
+    )
+
+
+@router.delete("/{file_id}", status_code=204)
+async def delete_uploaded_file(file_id: UUID, db: AsyncSession = Depends(get_db)):
+    from app.services.upload_svc import delete_file_with_dify
+    result = await db.execute(
+        select(UploadedFile).where(
+            UploadedFile.id == file_id,
+            UploadedFile.deleted_at.is_(None),
+        )
+    )
+    f = result.scalar_one_or_none()
+    if not f:
+        raise HTTPException(404, detail="File not found")
+    await delete_file_with_dify(db, f)
