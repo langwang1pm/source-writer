@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models.session import Session
 from app.models.workspace import Workspace
+from app.models.chat_message import ChatMessage
 from app.schemas.session import (
     SessionCreate, SessionResponse, SessionListResponse,
 )
@@ -81,3 +82,34 @@ async def delete_session(session_id: UUID, db: AsyncSession = Depends(get_db)):
         raise HTTPException(404, detail="Session not found")
     session.deleted_at = datetime.now(timezone.utc)
     await db.commit()
+
+
+@router.get("/{session_id}/stream")
+async def stream_chat(
+    session_id: UUID,
+    user_message_id: UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    from fastapi.responses import StreamingResponse
+
+    session = await db.get(Session, session_id)
+    if not session or session.deleted_at is not None:
+        raise HTTPException(404, detail="Session not found")
+
+    msg = await db.get(ChatMessage, user_message_id)
+    if not msg or msg.deleted_at is not None:
+        raise HTTPException(404, detail="Message not found")
+    if msg.session_id != session_id:
+        raise HTTPException(400, detail="Message not in this session")
+
+    from app.services.stream_svc import create_stream_service
+    svc = create_stream_service(db, session_id, user_message_id)
+    return StreamingResponse(
+        svc.stream(msg.content),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
