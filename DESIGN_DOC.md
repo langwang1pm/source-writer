@@ -1,4 +1,4 @@
-﻿# source-writer 设计文档
+# source-writer 设计文档
 
 > 基于 patent-writer 项目经验沉淀与重构设计
 > 最终更新：2026-06-13
