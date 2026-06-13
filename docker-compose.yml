@@ -1,0 +1,52 @@
+
+version: "3.9"
+
+services:
+  backend:
+    build:
+      context: ./backend
+    container_name: sw-backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - uploads:/data/uploads
+    networks:
+      - sw-network
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: sw-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - uploads:/data/uploads
+    depends_on:
+      - backend
+      - onlyoffice
+    networks:
+      - sw-network
+
+  onlyoffice:
+    image: onlyoffice/documentserver:8.2.0
+    container_name: sw-onlyoffice
+    restart: unless-stopped
+    volumes:
+      - onlyoffice_data:/var/www/onlyoffice/Data
+    networks:
+      - sw-network
+
+volumes:
+  uploads:
+    driver: local
+    driver_opts:
+      type: none
+      device: /data/source-writer/uploads
+      o: bind
+  onlyoffice_data:
+
+networks:
+  sw-network:
+    driver: bridge
