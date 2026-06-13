@@ -56,6 +56,10 @@ export const workspaces = {
   },
   create: (data: { name: string; client_enterprise_id: string }) =>
     request<any>("/workspaces", { method: "POST", body: JSON.stringify(data) }),
+  update: (id: string, data: { name?: string }) =>
+    request<any>(`/workspaces/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  delete: (id: string) =>
+    request<void>(`/workspaces/${id}`, { method: "DELETE" }),
 };
 
 // === Sessions ===
