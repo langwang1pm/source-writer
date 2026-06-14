@@ -16,21 +16,20 @@ export default function KnowledgePage() {
     if (!workspaceId) return;
     workspaces.get(workspaceId).then((ws) => {
       setEnterpriseId(ws.client_enterprise_id);
+      loadFiles(ws.client_enterprise_id);
     }).catch(() => {});
   }, [workspaceId]);
 
-  const loadFiles = async () => {
+  const loadFiles = async (entId?: string) => {
     setLoading(true);
     try {
-      const res = await uploadedFiles.list();
+      const eid = entId || enterpriseId;
+      const res = await uploadedFiles.list(eid ? { enterprise_id: eid } : undefined);
       setFiles(res.items || []);
     } catch {}
     setLoading(false);
   };
 
-  useEffect(() => {
-    loadFiles();
-  }, [workspaceId]);
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -40,13 +39,13 @@ export default function KnowledgePage() {
     if (enterpriseId) {
       await uploadedFiles.uploadWithEnterprise(formData, enterpriseId);
     }
-    loadFiles();
+    loadFiles(enterpriseId);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const handleDelete = async (id: string) => {
     await uploadedFiles.delete(id);
-    loadFiles();
+    loadFiles(enterpriseId);
   };
 
   const statusColor = (s: string) => {
