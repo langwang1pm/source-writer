@@ -60,6 +60,7 @@ export const workspaces = {
     request<any>(`/workspaces/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   delete: (id: string) =>
     request<void>(`/workspaces/${id}`, { method: "DELETE" }),
+  get: (id: string) => request<any>(`/workspaces/${id}`),
 };
 
 // === Sessions ===
@@ -125,6 +126,8 @@ export const uploadedFiles = {
   },
   upload: (formData: FormData) =>
     fetch(`${BASE}/uploaded-files`, { method: "POST", body: formData }),
+  uploadWithEnterprise: (formData: FormData, enterpriseId: string) =>
+    fetch(`${BASE}/uploaded-files?enterprise_id=${enterpriseId}`, { method: "POST", body: formData }),
   delete: (id: string) => request<void>(`/uploaded-files/${id}`, { method: "DELETE" }),
   downloadUrl: (id: string) => `${BASE}/uploaded-files/${id}/download`,
 };

@@ -2,14 +2,22 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { Upload, FileText, Trash2, Download } from "lucide-react";
-import { uploadedFiles } from "../api/client";
+import { uploadedFiles, workspaces } from "../api/client";
 import type { UploadedFile } from "../types";
 
 export default function KnowledgePage() {
   const { workspaceId } = useParams();
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [loading, setLoading] = useState(true);
+  const [enterpriseId, setEnterpriseId] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!workspaceId) return;
+    workspaces.get(workspaceId).then((ws) => {
+      setEnterpriseId(ws.client_enterprise_id);
+    }).catch(() => {});
+  }, [workspaceId]);
 
   const loadFiles = async () => {
     setLoading(true);
@@ -29,7 +37,9 @@ export default function KnowledgePage() {
     if (!file) return;
     const formData = new FormData();
     formData.append("file", file);
-    await uploadedFiles.upload(formData);
+    if (enterpriseId) {
+      await uploadedFiles.uploadWithEnterprise(formData, enterpriseId);
+    }
     loadFiles();
     if (fileInputRef.current) fileInputRef.current.value = "";
   };

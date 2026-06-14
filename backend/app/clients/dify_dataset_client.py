@@ -25,16 +25,56 @@ class DifyDatasetClient:
         url = f"{self.BASE_URL}/v1/datasets/{self.DATASET_ID}/document/create-by-file"
         headers = {"Authorization": f"Bearer {self.API_KEY}"}
 
+        # Config must be sent as a JSON string in the 'data' form field
+        data_config = {
+            "indexing_technique": settings.dify_indexing_technique,
+            "doc_form": settings.dify_doc_form,
+            "doc_language": "Chinese Simplified",
+            "process_rule": {
+                "mode": settings.dify_process_rule_mode,
+                "rules": {
+                    "pre_processing_rules": [
+                        {"id": "remove_extra_spaces", "enabled": True},
+                        {"id": "remove_urls_emails", "enabled": False},
+                    ],
+                    "segmentation": {
+                        "separator": "\n\n",
+                        "max_tokens": 1024,
+                    },
+                    "parent_mode": "paragraph",
+                    "subchunk_segmentation": {
+                        "separator": "\n",
+                        "max_tokens": 512,
+                    },
+                },
+            },
+            "retrieval_model": {
+                "search_method": "hybrid_search",
+                "reranking_enable": True,
+                "reranking_mode": "weighted_score",
+                "reranking_model": {
+                    "reranking_provider_name": "langgenius/tongyi/tongyi",
+                    "reranking_model_name": "qwen3-rerank",
+                },
+                "weights": {
+                    "weight_type": "customized",
+                    "keyword_setting": {"keyword_weight": 0.3},
+                    "vector_setting": {"vector_weight": 0.7, "embedding_model_name": "", "embedding_provider_name": ""},
+                },
+                "top_k": 5,
+                "score_threshold_enabled": True,
+                "score_threshold": 0.5,
+            },
+            "embedding_model": "multimodal-embedding-v1",
+            "embedding_model_provider": "langgenius/tongyi/tongyi",
+        }
+
         timeout = httpx.Timeout(300.0, connect=10.0, read=300.0)
         async with httpx.AsyncClient(timeout=timeout) as client:
             with open(file_path, "rb") as f:
                 files = {"file": (file_name, f, "application/octet-stream")}
-                data = {
-                    "indexing_technique": settings.dify_indexing_technique,
-                    "process_rule_mode": settings.dify_process_rule_mode,
-                    "doc_form": "hierarchical_model",
-                }
-                resp = await client.post(url, headers=headers, data=data, files=files)
+                form_data = {"data": json.dumps(data_config)}
+                resp = await client.post(url, headers=headers, data=form_data, files=files)
             if resp.status_code != 200:
                 return None
             result = resp.json()

@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     # Dify knowledge config
     dify_indexing_technique: str = "high_quality"
     dify_process_rule_mode: str = "automatic"
+    dify_doc_form: str = "text_model"
 
     # Storage
     upload_dir: str = "./uploads"
