@@ -69,8 +69,7 @@ async def upload_file(
         status = dify_result["status"]
         # Set metadata (company tag)
         await dify_dataset_client.set_metadata(
-            dify_doc_id,
-            {"company": str(enterprise_id)},
+            dify_doc_id, str(enterprise_id),
         )
 
     # Create DB record

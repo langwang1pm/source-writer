@@ -82,20 +82,42 @@ class DifyDatasetClient:
             }
 
     async def set_metadata(
-        self, dify_document_id: str, metadata: dict,
+        self, dify_document_id: str, enterprise_id: str,
     ) -> bool:
-        """Set metadata on a Dify document (e.g. company tag)."""
+        """Set company metadata on a Dify document using the Dify batch metadata API."""
         if not self.BASE_URL or not self.DATASET_ID:
             return False
-        url = f"{self.BASE_URL}/v1/datasets/{self.DATASET_ID}/documents/{dify_document_id}/metadata"
-        headers = {
-            "Authorization": f"Bearer {self.API_KEY}",
-            "Content-Type": "application/json",
-        }
         timeout = httpx.Timeout(30.0)
         async with httpx.AsyncClient(timeout=timeout) as client:
-            resp = await client.post(url, headers=headers, json=metadata)
-            return resp.status_code == 200
+            # Step 1: Get the metadata field ID for "company"
+            meta_url = f"{self.BASE_URL}/v1/datasets/{self.DATASET_ID}/metadata"
+            headers = {"Authorization": f"Bearer {self.API_KEY}"}
+            resp = await client.get(meta_url, headers=headers)
+            if resp.status_code != 200:
+                return False
+            meta_list = resp.json().get("doc_metadata", [])
+            field_id = None
+            for m in meta_list:
+                if m.get("name") == "company":
+                    field_id = m.get("id")
+                    break
+            if not field_id:
+                return False
+
+            # Step 2: Set metadata on the document
+            set_url = f"{self.BASE_URL}/v1/datasets/{self.DATASET_ID}/documents/metadata"
+            payload = {
+                "operation_data": [
+                    {
+                        "document_id": dify_document_id,
+                        "metadata_list": [
+                            {"id": field_id, "name": "company", "value": enterprise_id}
+                        ],
+                    }
+                ]
+            }
+            resp2 = await client.post(set_url, headers=headers, json=payload)
+            return resp2.status_code in (200, 201)
 
     async def delete_document(self, dify_document_id: str) -> bool:
         """Delete a document from Dify knowledge base."""
