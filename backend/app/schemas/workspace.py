@@ -22,6 +22,7 @@ class WorkspaceResponse(BaseModel):
     created_at: datetime
     updated_at: datetime | None = None
     client_enterprise_name: str | None = None
+    client_enterprise_deleted: bool = False
 
     model_config = ConfigDict(from_attributes=True)
 

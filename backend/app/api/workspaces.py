@@ -55,10 +55,11 @@ async def list_workspaces(
     for ws in items:
         r = WorkspaceResponse.model_validate(ws)
         r.client_enterprise_name = ws.client_enterprise.name if ws.client_enterprise else None
+        r.client_enterprise_deleted = ws.client_enterprise.deleted_at is not None if ws.client_enterprise else False
         resp_items.append(r)
     return WorkspaceListResponse(
-        items=resp_items, total=total, page=page, page_size=page_size,
-        total_pages=(total + page_size - 1) // page_size,
+    items=resp_items, total=total, page=page, page_size=page_size,
+    total_pages=(total + page_size - 1) // page_size,
     )
 
 
@@ -74,6 +75,7 @@ async def get_workspace(workspace_id: UUID, db: AsyncSession = Depends(get_db)):
         raise HTTPException(404, detail="Workspace not found")
     r = WorkspaceResponse.model_validate(ws)
     r.client_enterprise_name = ws.client_enterprise.name if ws.client_enterprise else None
+    r.client_enterprise_deleted = ws.client_enterprise.deleted_at is not None if ws.client_enterprise else False
     return r
 
 
@@ -95,6 +97,7 @@ async def update_workspace(
     await db.refresh(ws)
     r = WorkspaceResponse.model_validate(ws)
     r.client_enterprise_name = ws.client_enterprise.name if ws.client_enterprise else None
+    r.client_enterprise_deleted = ws.client_enterprise.deleted_at is not None if ws.client_enterprise else False
     return r
 
 

@@ -22,6 +22,7 @@ export interface Workspace {
   name: string;
   client_enterprise_id: string;
   client_enterprise_name?: string;
+  client_enterprise_deleted?: boolean;
   created_at: string;
   updated_at: string | null;
 }

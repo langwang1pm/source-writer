@@ -2,7 +2,8 @@
 import { useState, useEffect } from "react";
 import { Outlet, useParams, useNavigate, useLocation } from "react-router-dom";
 import { MessageSquare, Plus, FolderOpen, LogOut } from "lucide-react";
-import { sessions } from "../../api/client";
+import { sessions, workspaces } from "../../api/client";
+import type { Workspace } from "../../types";
 import type { Session } from "../../types";
 
 export default function MainLayout() {
@@ -13,6 +14,7 @@ export default function MainLayout() {
 
   const [sessionList, setSessionList] = useState<Session[]>([]);
   const [loading, setLoading] = useState(false);
+  const [wsName, setWsName] = useState("");
 
   useEffect(() => {
     if (!workspaceId) return;
@@ -20,6 +22,11 @@ export default function MainLayout() {
     sessions.list({ workspace_id: workspaceId }).then((res) => {
       setSessionList(res.items || []);
     }).finally(() => setLoading(false));
+  }, [workspaceId]);
+
+  useEffect(() => {
+    if (!workspaceId) return;
+    workspaces.get(workspaceId).then((w) => setWsName(w.name)).catch(() => {});
   }, [workspaceId]);
 
   const createSession = async () => {
@@ -37,8 +44,9 @@ export default function MainLayout() {
         borderRight: "1px solid #e5e5e5",
         display: "flex", flexDirection: "column",
       }}>
-        <div style={{ padding: "12px 14px", borderBottom: "1px solid #e5e5e5", fontSize: 14, fontWeight: 600 }}>
-          Source Writer
+        <div style={{ padding: "12px 14px", borderBottom: "1px solid #e5e5e5" }}>
+          <div style={{ fontSize: 14, fontWeight: 600 }}>Source Writer</div>
+          {wsName && <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>{wsName}</div>}
         </div>
 
         <div style={{ padding: "8px 14px" }}>

@@ -52,7 +52,7 @@ export default function HomePage() {
   };
 
   return (
-    <div style={{ maxWidth: 900, margin: "0 auto", padding: "40px 24px" }}>
+    <div style={{ maxWidth: 1200, margin: "0 auto", padding: "40px 24px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 32 }}>
         <div>
           <h1 style={{ fontSize: 24, fontWeight: 700, margin: 0 }}>Source Writer</h1>
@@ -100,7 +100,7 @@ export default function HomePage() {
           </button>
         </div>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
           {wsList.map((ws) => (
             <div
               key={ws.id}
@@ -116,11 +116,11 @@ export default function HomePage() {
                 <div style={{ flex: 1, cursor: "pointer" }} onClick={() => navigate(`/workspace/${ws.id}/chat`)}>
                   <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 6 }}>{ws.name}</div>
                   {ws.client_enterprise_name && (
-                    <div style={{ fontSize: 13, color: "#888" }}>{ws.client_enterprise_name}</div>
+                    <div style={{ fontSize: 13, color: "#888" }}>{ws.client_enterprise_name}{ws.client_enterprise_deleted ? "（已删除）" : ""}</div>
                   )}
                   <div style={{ marginTop: 12 }}>
                     <span style={{ fontSize: 12, color: "#1a73e8", background: "#e8f0fe", padding: "2px 8px", borderRadius: 4 }}>
-                      进入对话 →
+                      进入空间 →
                     </span>
                   </div>
                 </div>
