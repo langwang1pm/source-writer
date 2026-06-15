@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     dify_embedding_model_provider: str = "langgenius/ollama/ollama"
     dify_office_base_url: str = ""
     dify_public_url: str = ""
+    dify_office_secret: str = ""
 
     # Storage
     upload_dir: str = "./uploads"
