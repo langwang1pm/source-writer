@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     dify_score_threshold: float = 0.3
     dify_embedding_model: str = "qwen3-embedding:4b"
     dify_embedding_model_provider: str = "langgenius/ollama/ollama"
+    dify_office_base_url: str = ""
+    dify_public_url: str = ""
 
     # Storage
     upload_dir: str = "./uploads"
