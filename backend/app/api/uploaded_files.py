@@ -5,6 +5,7 @@ from pathlib import Path
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
+from starlette.requests import Request
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -164,6 +165,44 @@ async def preview_uploaded_file(file_id: UUID, db: AsyncSession = Depends(get_db
         media_type=f.mime_type or "application/octet-stream",
         headers={"Content-Disposition": "inline"},
     )
+
+
+
+@router.get("/{file_id}/office-preview")
+async def office_preview_file(file_id: UUID, request: Request, db: AsyncSession = Depends(get_db)):
+    """Preview a file using OnlyOffice Document Server."""
+    from starlette.responses import HTMLResponse
+    from app.config import settings
+    import json
+    result = await db.execute(select(UploadedFile).where(UploadedFile.id == file_id, UploadedFile.deleted_at.is_(None)))
+    f = result.scalar_one_or_none()
+    if not f:
+        raise HTTPException(404, detail="File not found")
+    base_url = settings.dify_public_url or str(request.base_url).rstrip('/')
+    doc_url = base_url + "/api/v1/uploaded-files/" + str(file_id) + "/download"
+    onlyoffice_url = settings.dify_office_base_url or "http://192.168.2.121:8080"
+    ext = f.file_name.split(".")[-1].lower() if "." in f.file_name else ""
+    dc = {
+        "document": {
+            "fileType": ext,
+            "key": str(file_id),
+            "title": f.file_name,
+            "url": doc_url
+        },
+        "documentType": "word",
+        "editorConfig": {
+            "mode": "view",
+            "user": {"name": "Preview", "id": "preview"}
+        }
+    }
+    cjson = json.dumps(dc, ensure_ascii=False)
+    h  = '<!DOCTYPE html><html><head><meta charset=utf-8>'
+    h += '<script src="' + onlyoffice_url + '/web-apps/apps/api/documents/api.js"></script>'
+    h += '</head><body style=margin:0;height:100vh>'
+    h += '<div id=placeholder style=height:100%></div><script>'
+    h += 'new DocsAPI.DocEditor("placeholder",' + cjson + ');'
+    h += '</script></body></html>'
+    return HTMLResponse(content=h)
 
 
 @router.post("/{file_id}/refresh-status")
