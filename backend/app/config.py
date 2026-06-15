@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     dify_indexing_technique: str = "high_quality"
     dify_process_rule_mode: str = "automatic"
     dify_doc_form: str = "text_model"
+    dify_reranking_enable: bool = False
+    dify_score_threshold: float = 0.3
+    dify_embedding_model: str = "qwen3-embedding:4b"
+    dify_embedding_model_provider: str = "langgenius/ollama/ollama"
 
     # Storage
     upload_dir: str = "./uploads"

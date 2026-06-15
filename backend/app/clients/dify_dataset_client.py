@@ -50,12 +50,9 @@ class DifyDatasetClient:
             },
             "retrieval_model": {
                 "search_method": "hybrid_search",
-                "reranking_enable": True,
+                "reranking_enable": settings.dify_reranking_enable,
                 "reranking_mode": "weighted_score",
-                "reranking_model": {
-                    "reranking_provider_name": "langgenius/tongyi/tongyi",
-                    "reranking_model_name": "qwen3-rerank",
-                },
+                "reranking_model": {"reranking_provider_name": "", "reranking_model_name": ""},
                 "weights": {
                     "weight_type": "customized",
                     "keyword_setting": {"keyword_weight": 0.3},
@@ -63,10 +60,10 @@ class DifyDatasetClient:
                 },
                 "top_k": 5,
                 "score_threshold_enabled": True,
-                "score_threshold": 0.5,
+                "score_threshold": settings.dify_score_threshold,
             },
-            "embedding_model": "multimodal-embedding-v1",
-            "embedding_model_provider": "langgenius/tongyi/tongyi",
+            "embedding_model": settings.dify_embedding_model,
+            "embedding_model_provider": settings.dify_embedding_model_provider,
         }
 
         timeout = httpx.Timeout(300.0, connect=10.0, read=300.0)

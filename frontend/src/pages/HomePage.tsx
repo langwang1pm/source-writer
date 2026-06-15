@@ -96,7 +96,7 @@ export default function HomePage() {
             style={{ padding: "10px 24px", borderRadius: 8, border: "none", background: "#1a1a2e", color: "#fff", cursor: "pointer", fontSize: 14, display: "inline-flex", alignItems: "center", gap: 6 }}
           >
             <Plus size={16} />
-            创建项目空间
+            新建项目空间
           </button>
         </div>
       ) : (
