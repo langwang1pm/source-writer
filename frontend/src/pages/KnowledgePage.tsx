@@ -85,6 +85,14 @@ export default function KnowledgePage() {
     }
   };
 
+  const getPreviewHref = (f: UploadedFile) => {
+    const name = f.file_name.toLowerCase();
+    if (name.endsWith('.doc') || name.endsWith('.docx')) {
+      return uploadedFiles.officePreviewUrl(f.id);
+    }
+    return uploadedFiles.previewUrl(f.id);
+  };
+
   return (
     <div style={{ padding: 24, flex: 1, overflow: "auto" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
@@ -126,7 +134,7 @@ export default function KnowledgePage() {
               </div>
               <div style={{ display: "flex", gap: 6 }}>
                 <a
-                  href={uploadedFiles.previewUrl(f.id)}
+                  href={getPreviewHref(f)}
                   target="_blank"
                   rel="noopener noreferrer"
                   style={{ padding: 6, borderRadius: 6, border: "none", background: "transparent", cursor: "pointer", color: "#666" }}

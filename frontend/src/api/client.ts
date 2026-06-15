@@ -132,5 +132,6 @@ export const uploadedFiles = {
     fetch(`${BASE}/uploaded-files?enterprise_id=${enterpriseId}`, { method: "POST", body: formData }),
   delete: (id: string) => request<void>(`/uploaded-files/${id}`, { method: "DELETE" }),
   downloadUrl: (id: string) => `${BASE}/uploaded-files/${id}/download`,
-  previewUrl: (id: string) => `${BASE}/uploaded-files/${id}/preview`,
+    previewUrl: (id: string) => `${BASE}/uploaded-files/${id}/preview`,
+    officePreviewUrl: (id: string) => `${BASE}/uploaded-files/${id}/office-preview`,
 };
