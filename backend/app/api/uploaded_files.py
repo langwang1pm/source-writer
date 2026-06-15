@@ -125,6 +125,7 @@ async def delete_uploaded_file(file_id: UUID, db: AsyncSession = Depends(get_db)
 @router.post("/{file_id}/refresh-status")
 async def refresh_file_status_endpoint(file_id: UUID, db: AsyncSession = Depends(get_db)):
     """Refresh a single file's status from Dify."""
+    from app.services.upload_svc import refresh_file_status
     result = await db.execute(
         select(UploadedFile).where(
             UploadedFile.id == file_id,
