@@ -50,18 +50,25 @@ export default function KnowledgePage() {
 
   const statusColor = (s: string) => {
     switch (s) {
-      case "available": return "#27ae60";
-      case "indexing": return "#f39c12";
+      case "completed": case "available": return "#27ae60";
+      case "indexing": case "parsing": case "cleaning": case "splitting": return "#f39c12";
       case "error": return "#e74c3c";
-      default: return "#999";
+      case "waiting": case "pending": case "paused": return "#999";
+      default: return "#888";
     }
   };
 
   const statusLabel = (s: string) => {
     switch (s) {
+      case "completed": return "已完成";
       case "available": return "可用";
       case "indexing": return "索引中";
+      case "parsing": return "解析中";
+      case "cleaning": return "清洗中";
+      case "splitting": return "分块中";
+      case "waiting": return "等待中";
       case "pending": return "等待中";
+      case "paused": return "已暂停";
       case "error": return "错误";
       default: return s;
     }
