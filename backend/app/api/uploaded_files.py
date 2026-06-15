@@ -140,6 +140,33 @@ async def delete_uploaded_file(file_id: UUID, db: AsyncSession = Depends(get_db)
     await delete_file_with_dify(db, f)
 
 
+@router.get("/{file_id}/preview")
+async def preview_uploaded_file(file_id: UUID, db: AsyncSession = Depends(get_db)):
+    """Preview a file (inline disposition for browser viewing)."""
+    from fastapi.responses import FileResponse
+    result = await db.execute(
+        select(UploadedFile).where(
+            UploadedFile.id == file_id,
+            UploadedFile.deleted_at.is_(None),
+        )
+    )
+    f = result.scalar_one_or_none()
+    if not f:
+        raise HTTPException(404, detail="File not found")
+    if not f.local_path:
+        raise HTTPException(404, detail="File not available on disk")
+    from app.config import settings
+    file_path = Path(settings.upload_dir) / f.local_path
+    if not file_path.exists():
+        raise HTTPException(404, detail="File not found on disk")
+    return FileResponse(
+        path=str(file_path),
+        filename=f.file_name,
+        media_type=f.mime_type or "application/octet-stream",
+        headers={"Content-Disposition": "inline; filename=\"" + f.file_name + "\""},
+    )
+
+
 @router.post("/{file_id}/refresh-status")
 async def refresh_file_status_endpoint(file_id: UUID, db: AsyncSession = Depends(get_db)):
     """Refresh a single file's status from Dify."""

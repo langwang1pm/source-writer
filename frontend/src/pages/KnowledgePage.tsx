@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
-import { Upload, FileText, Trash2, Download } from "lucide-react";
+import { Upload, FileText, Trash2, Download, Eye } from "lucide-react";
 import { uploadedFiles, workspaces } from "../api/client";
 import type { UploadedFile } from "../types";
 
@@ -125,6 +125,15 @@ export default function KnowledgePage() {
                 </div>
               </div>
               <div style={{ display: "flex", gap: 6 }}>
+                <a
+                  href={uploadedFiles.previewUrl(f.id)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ padding: 6, borderRadius: 6, border: "none", background: "transparent", cursor: "pointer", color: "#666" }}
+                  title="预览"
+                >
+                  <Eye size={16} />
+                </a>
                 <a
                   href={uploadedFiles.downloadUrl(f.id)}
                   style={{ padding: 6, borderRadius: 6, border: "none", background: "transparent", cursor: "pointer", color: "#666" }}
