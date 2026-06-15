@@ -161,9 +161,8 @@ async def preview_uploaded_file(file_id: UUID, db: AsyncSession = Depends(get_db
         raise HTTPException(404, detail="File not found on disk")
     return FileResponse(
         path=str(file_path),
-        filename=f.file_name,
         media_type=f.mime_type or "application/octet-stream",
-        headers={"Content-Disposition": "inline; filename=\"" + f.file_name + "\""},
+        headers={"Content-Disposition": "inline"},
     )
 
 
