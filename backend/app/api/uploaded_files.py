@@ -174,6 +174,7 @@ async def office_preview_file(file_id: UUID, request: Request, db: AsyncSession 
     from starlette.responses import HTMLResponse
     from app.config import settings
     import json
+    import jwt
     result = await db.execute(select(UploadedFile).where(UploadedFile.id == file_id, UploadedFile.deleted_at.is_(None)))
     f = result.scalar_one_or_none()
     if not f:
@@ -195,6 +196,8 @@ async def office_preview_file(file_id: UUID, request: Request, db: AsyncSession 
             "user": {"name": "Preview", "id": "preview"}
         }
     }
+    if settings.dify_office_secret:
+        dc["token"] = jwt.encode(dc, settings.dify_office_secret, algorithm="HS256")
     cjson = json.dumps(dc, ensure_ascii=False)
     h  = '<!DOCTYPE html><html><head><meta charset=utf-8>'
     h += '<script src="' + onlyoffice_url + '/web-apps/apps/api/documents/api.js"></script>'
