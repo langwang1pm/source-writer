@@ -125,18 +125,19 @@ async def delete_uploaded_file(file_id: UUID, db: AsyncSession = Depends(get_db)
 @router.post("/{file_id}/refresh-status")
 async def refresh_file_status_endpoint(file_id: UUID, db: AsyncSession = Depends(get_db)):
     """Refresh a single file's status from Dify."""
-    from app.services.upload_svc import refresh_file_status
-    result = await db.execute(
-        select(UploadedFile).where(
-            UploadedFile.id == file_id,
-            UploadedFile.deleted_at.is_(None),
-        )
-    )
-    f = result.scalar_one_or_none()
-    if not f:
-        raise HTTPException(404, detail="File not found")
     try:
+        from app.services.upload_svc import refresh_file_status
+        result = await db.execute(
+            select(UploadedFile).where(
+                UploadedFile.id == file_id,
+                UploadedFile.deleted_at.is_(None),
+            )
+        )
+        f = result.scalar_one_or_none()
+        if not f:
+            raise HTTPException(404, detail="File not found")
         status = await refresh_file_status(db, f)
         return {"status": status or f.status}
     except Exception as e:
-        return {"error": str(e)}, 500
+        import traceback
+        return {"error": str(e), "traceback": traceback.format_exc()}, 500
