@@ -39,9 +39,27 @@ async def list_uploaded_files(
         .limit(page_size)
     )
     items = result.scalars().all()
-
-
-
+    # Sync non-final statuses from Dify (in-memory only)
+    import httpx, asyncio
+    from app.config import settings
+    dify_h = {'Authorization': 'Bearer ' + (settings.dify_dataset_api_key or settings.dify_app_api_key)}
+    async def _fetch(f):
+        try:
+            url = settings.dify_base_url + "/v1/datasets/" + settings.dify_dataset_id + "/documents/" + f.dify_document_id
+            async with httpx.AsyncClient() as c:
+                r = await c.get(url, headers=dify_h, timeout=10)
+                if r.status_code == 200:
+                    s = r.json().get("indexing_status")
+                    if s and s != f.status:
+                        f.status = s
+        except:
+            pass
+    tasks = []
+    for f in items:
+        if f.dify_document_id and f.status not in ("available", "completed", "error"):
+            tasks.append(_fetch(f))
+    if tasks:
+        await asyncio.gather(*tasks)
     return UploadedFileListResponse(
         items=items, total=total, page=page, page_size=page_size,
         total_pages=(total + page_size - 1) // page_size,
