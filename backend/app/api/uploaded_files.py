@@ -135,26 +135,8 @@ async def refresh_file_status_endpoint(file_id: UUID, db: AsyncSession = Depends
     f = result.scalar_one_or_none()
     if not f:
         raise HTTPException(404, detail="File not found")
-    status = await refresh_file_status(db, f)
-    return {"status": status or f.status}
-
-
-@router.post("/{file_id}/refresh-status-debug")
-async def refresh_file_status_debug(file_id: UUID, db: AsyncSession = Depends(get_db)):
-    """Debug version that catches and returns errors."""
-    from app.services.upload_svc import refresh_file_status
-    result = await db.execute(
-        select(UploadedFile).where(
-            UploadedFile.id == file_id,
-            UploadedFile.deleted_at.is_(None),
-        )
-    )
-    f = result.scalar_one_or_none()
-    if not f:
-        raise HTTPException(404, detail="File not found")
     try:
         status = await refresh_file_status(db, f)
-        return {"status_res": status, "old_status": f.status}
+        return {"status": status or f.status}
     except Exception as e:
-        import traceback
-        return {"error": str(e), "traceback": traceback.format_exc()}
+        return {"error": str(e)}, 500

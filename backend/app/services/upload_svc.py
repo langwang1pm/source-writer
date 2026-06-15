@@ -116,6 +116,12 @@ async def refresh_file_status(
         return None
     status = await dify_dataset_client.get_document_status(uploaded_file.dify_document_id)
     if status and status != uploaded_file.status:
-        uploaded_file.status = status
+        from sqlalchemy import update as sa_update
+        await db.execute(
+            sa_update(UploadedFile)
+            .where(UploadedFile.id == uploaded_file.id)
+            .values(status=status)
+        )
         await db.commit()
+        uploaded_file.status = status
     return status
