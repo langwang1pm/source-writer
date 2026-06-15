@@ -124,6 +124,8 @@ export const uploadedFiles = {
     if (params?.search) q.set("search", params.search);
     return request<any>(`/uploaded-files?${q}`);
   },
+  refreshStatus: (id: string) =>
+    request<any>(`/uploaded-files/${id}/refresh-status`, { method: "POST" }),
   upload: (formData: FormData) =>
     fetch(`${BASE}/uploaded-files`, { method: "POST", body: formData }),
   uploadWithEnterprise: (formData: FormData, enterpriseId: string) =>

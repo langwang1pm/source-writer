@@ -33,7 +33,6 @@ async def list_uploaded_files(
         q = q.where(UploadedFile.file_name.ilike(f"%{search}%"))
     count_q = select(func.count()).select_from(q.subquery())
     total = (await db.execute(count_q)).scalar()
-    from app.services.upload_svc import refresh_file_status
     result = await db.execute(
         q.order_by(UploadedFile.created_at.desc())
         .offset((page - 1) * page_size)
@@ -41,10 +40,7 @@ async def list_uploaded_files(
     )
     items = result.scalars().all()
 
-    # Refresh pending statuses from Dify
-    for f in items:
-        if f.dify_document_id and f.status not in ("available", "completed", "error"):
-            await refresh_file_status(db, f)
+
 
     return UploadedFileListResponse(
         items=items, total=total, page=page, page_size=page_size,
@@ -114,7 +110,6 @@ async def download_uploaded_file(file_id: UUID, db: AsyncSession = Depends(get_d
 @router.delete("/{file_id}", status_code=204)
 async def delete_uploaded_file(file_id: UUID, db: AsyncSession = Depends(get_db)):
     from app.services.upload_svc import delete_file_with_dify
-    from app.services.upload_svc import refresh_file_status
     result = await db.execute(
         select(UploadedFile).where(
             UploadedFile.id == file_id,

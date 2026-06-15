@@ -25,7 +25,18 @@ export default function KnowledgePage() {
     try {
       const eid = entId || enterpriseId;
       const res = await uploadedFiles.list(eid ? { enterprise_id: eid } : undefined);
-      setFiles(res.items || []);
+      const items = res.items || [];
+      setFiles(items);
+      // Refresh non-final statuses from Dify
+      for (const f of items) {
+        if (f.dify_document_id && !["available", "completed", "error"].includes(f.status)) {
+          try {
+            const result = await uploadedFiles.refreshStatus(f.id);
+            f.status = result.status;
+          } catch {}
+        }
+      }
+      setFiles([...items]);
     } catch {}
     setLoading(false);
   };
