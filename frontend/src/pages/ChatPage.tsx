@@ -1,7 +1,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
-import { sessions, messages, messageBlocks, responseDocs } from "../api/client";
+import { sessions, messages as messagesApi, messageBlocks, responseDocs } from "../api/client";
 import { useSSE } from "../hooks/useSSE";
 import MessageCard from "../components/chat/MessageCard";
 import MessageInput from "../components/chat/MessageInput";
@@ -42,7 +42,7 @@ export default function ChatPage() {
 
   const loadMessages = async (sid: string) => {
     try {
-      const res = await messages.list(sid);
+      const res = await messagesApi.list(sid);
       const msgList: DisplayMessage[] = [];
 
       for (const msg of (res.items || []) as ChatMessage[]) {
@@ -78,7 +78,7 @@ export default function ChatPage() {
     }
 
     // Save user message
-    const msgRes = await messages.send(sid, { content });
+    const msgRes = await messagesApi.send(sid, { content });
     const userMsg: DisplayMessage = {
       id: msgRes.id,
       role: "user",
@@ -89,7 +89,7 @@ export default function ChatPage() {
     setStreamingCard(null);
 
     // Start SSE stream
-    const streamUrl = messages.streamUrl(sid, msgRes.id);
+    const streamUrl = messagesApi.streamUrl(sid, msgRes.id);
     startStream(streamUrl, {
       onThinkDelta: (cardOrdinal, delta) => {
         setStreamBlocks((prev) => {
@@ -208,7 +208,7 @@ export default function ChatPage() {
             )}
             <div style={{ flex: 1, overflow: "auto", background: "#f5f5f7" }}>
               {messages.map((msg) => (
-                <MessageCard key={msg.id} role={msg.role} content={msg.content} blocks={msg.blocks} />
+                <MessageCard key={msg.id} role={msg.role} content={msg.content} blocks={msg.blocks} responseDoc={msg.responseDoc} />
               ))}
               {streamBlocks.length > 0 && (
                 <MessageCard role="assistant" blocks={streamBlocks} streamingCard={streamingCard} />

@@ -54,16 +54,41 @@ class StreamService:
         self.global_ordinal = 0
         self.current_card: CardState | None = None
         self.all_blocks: list[MessageBlock] = []
+        self._agent_buf: str = ""
+        self._pending_refs: list[dict] | None = None
 
     async def stream(self, query: str) -> AsyncGenerator[str, None]:
         """Main streaming loop. Yields SSE-formatted strings for the frontend."""
-        async for event in dify_chat_client.chat_stream(query=query):
+        # Fetch session context for Dify inputs
+        from app.models.session import Session
+        from app.models.workspace import Workspace
+        sess = await self.db.get(Session, self.session_id)
+        ttid = str(sess.task_type_id) if sess and sess.task_type_id else None
+        eid = None
+        if sess:
+            ws = await self.db.get(Workspace, sess.workspace_id)
+            if ws:
+                eid = str(ws.client_enterprise_id)
+
+        async for event in dify_chat_client.chat_stream(
+            query=query,
+            task_type_id=ttid,
+            enterprise_id=eid,
+        ):
             event_type = event.get("event", "")
 
             if event_type == "agent_thought":
                 # Flush previous card before starting new one
                 if self.current_card:
+                    card_ord = self.current_card.card_ordinal if self.current_card else 0
+                    card_ord = self.current_card.card_ordinal if self.current_card else 0
                     await self._flush_card()
+                    if self._pending_refs:
+                        yield self._sse("citation_update", {
+                            "card_ordinal": card_ord,
+                            "refs": self._pending_refs,
+                        })
+                        self._pending_refs = None
                 self.card_ordinal += 1
                 self.current_card = CardState(self.card_ordinal)
                 self.current_card.global_ordinal = self.global_ordinal
@@ -82,6 +107,21 @@ class StreamService:
                     self.current_card.global_ordinal = self.global_ordinal
                 answer_delta = event.get("answer", "")
                 if answer_delta:
+                    self._agent_buf += answer_delta
+                    close_count = self._agent_buf.count("</think>")
+                    if (close_count >= 1 and self.current_card and not self.current_card.is_empty()
+                            and self._agent_buf.count("<think>") > close_count):
+                        card_ord = self.current_card.card_ordinal if self.current_card else 0
+                        await self._flush_card()
+                        if self._pending_refs:
+                            yield self._sse("citation_update", {
+                                "card_ordinal": card_ord,
+                                "refs": self._pending_refs,
+                            })
+                            self._pending_refs = None
+                        self.card_ordinal += 1
+                        self.current_card = CardState(self.card_ordinal)
+                        self._agent_buf = answer_delta
                     self.current_card.add_answer(answer_delta)
                     yield self._sse("answer_delta", {
                         "card_ordinal": self.card_ordinal,
@@ -106,7 +146,14 @@ class StreamService:
 
         # If Dify returned no message_end, finalize anyway
         if self.current_card:
+            card_ord = self.current_card.card_ordinal if self.current_card else 0
             await self._flush_card()
+            if self._pending_refs:
+                yield self._sse("citation_update", {
+                    "card_ordinal": card_ord,
+                    "refs": self._pending_refs,
+                })
+                self._pending_refs = None
             yield self._sse("done", {"status": "ok"})
 
     async def _flush_card(self):
@@ -115,6 +162,79 @@ class StreamService:
         if not card or card.is_empty():
             self.current_card = None
             return
+
+        # Parse answer for embedded think tags
+        if not card.think_text and card.answer_text and "<think>" in card.answer_text.lower():
+            import re
+            full = card.answer_text
+            think_matches = list(re.finditer(r'<think>(.*?)</think>', full, re.DOTALL))
+
+            if len(think_matches) > 1:
+                for i, match in enumerate(think_matches):
+                    think_content = match.group(1)
+                    end_pos = match.end()
+                    if i + 1 < len(think_matches):
+                        next_start = think_matches[i + 1].start()
+                        answer_between = full[end_pos:next_start]
+                    else:
+                        answer_between = full[end_pos:]
+                    card_ordinal = card.card_ordinal + i
+
+                    if think_content:
+                        self.global_ordinal += 1
+                        blk = MessageBlock(
+                            session_id=self.session_id,
+                            user_message_id=self.user_message_id,
+                            card_ordinal=card_ordinal,
+                            block_type="think",
+                            content=think_content,
+                            ordinal=self.global_ordinal,
+                        )
+                        self.db.add(blk)
+                        self.all_blocks.append(blk)
+
+                    if answer_between:
+                        citations = parse_citations(answer_between, card_ordinal)
+                        self.global_ordinal += 1
+                        blk = MessageBlock(
+                            session_id=self.session_id,
+                            user_message_id=self.user_message_id,
+                            card_ordinal=card_ordinal,
+                            block_type="answer",
+                            content=answer_between,
+                            ordinal=self.global_ordinal,
+                        )
+                        self.db.add(blk)
+                        self.all_blocks.append(blk)
+                        await self.db.flush()
+                        for ref in citations:
+                            sr = SourceRef(
+                                response_doc_id=None,
+                                message_block_id=blk.id,
+                                card_ordinal=card_ordinal,
+                                ordinal=ref["ordinal"],
+                                source_name=ref["source_name"],
+                                char_position=ref["char_position"],
+                            )
+                            self.db.add(sr)
+
+                await self.db.flush()
+                self.current_card = None
+                return
+
+            think_parts = []
+            answer_parts = []
+            pos = 0
+            for match in think_matches:
+                if match.start() > pos:
+                    answer_parts.append(full[pos:match.start()])
+                think_parts.append(match.group(1))
+                pos = match.end()
+            if pos < len(full):
+                answer_parts.append(full[pos:])
+            if think_parts:
+                card.think_parts = think_parts
+                card.answer_parts = answer_parts
 
         # Write think block
         if card.think_text:
@@ -166,12 +286,9 @@ class StreamService:
                 })
 
             if refs_data:
-                yield self._sse("citation_update", {
-                    "card_ordinal": card.card_ordinal,
-                    "refs": refs_data,
-                })
+                self._pending_refs = refs_data
 
-        await self.db.commit()
+        await self.db.flush()
         self.current_card = None
 
     async def _on_message_end(self, event: dict):

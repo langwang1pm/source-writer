@@ -1,6 +1,8 @@
 
-import { Bot, User } from "lucide-react";
-import type { MessageBlock } from "../../types";
+import { useState } from "react";
+import { Bot, User, ChevronDown, ChevronUp, Sparkles, Download, FileText } from "lucide-react";
+import { responseDocs } from "../../api/client";
+import type { MessageBlock, ResponseDoc } from "../../types";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -9,9 +11,10 @@ interface Props {
   content?: string;
   blocks?: MessageBlock[];
   streamingCard?: number | null;
+  responseDoc?: ResponseDoc | null;
 }
 
-export default function MessageCard({ role, content, blocks, streamingCard }: Props) {
+export default function MessageCard({ role, content, blocks, streamingCard, responseDoc }: Props) {
   if (role === "user") {
     return (
       <div style={{ display: "flex", gap: 10, padding: "16px 20px", justifyContent: "flex-end" }}>
@@ -54,33 +57,84 @@ export default function MessageCard({ role, content, blocks, streamingCard }: Pr
       </div>
       <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
         {Array.from(cards.entries()).map(([cardOrdinal, card]) => (
-          <div key={cardOrdinal} style={{
-            background: "#fff",
-            border: "1px solid #e0e0e0",
-            borderRadius: 12,
-            overflow: "hidden",
-            opacity: streamingCard === cardOrdinal ? 0.8 : 1,
-          }}>
-            {card.think && (
-              <div style={{ padding: "12px 16px", background: "#f8f9fa", borderBottom: card.answer ? "1px solid #e0e0e0" : "none" }}>
-                <div style={{ fontSize: 12, color: "#888", marginBottom: 6 }}>思考过程</div>
-                <div style={{ fontSize: 13, lineHeight: 1.6, color: "#555", whiteSpace: "pre-wrap" }}>
-                  {card.think}
-                </div>
-              </div>
-            )}
-            {card.answer && (
-              <div style={{ padding: "12px 16px" }}>
-                <div className="markdown-body" style={{ fontSize: 14, lineHeight: 1.7 }}>
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                    {card.answer}
-                  </ReactMarkdown>
-                </div>
-              </div>
-            )}
-          </div>
-        ))}
+                  <CardItem
+                    key={cardOrdinal}
+                    card={card}
+                    isStreaming={streamingCard === cardOrdinal}
+                    isLastCard={cardOrdinal === Array.from(cards.keys()).pop()}
+                    responseDoc={responseDoc}
+                  />
+                ))}
       </div>
+    </div>
+  );
+}
+
+function CardItem({ card, isStreaming, isLastCard, responseDoc }: {
+  card: { think: string; answer: string };
+  isStreaming: boolean;
+  isLastCard: boolean;
+  responseDoc?: ResponseDoc | null;
+}) {
+  const [thinkingCollapsed, setThinkingCollapsed] = useState(true);
+  const hasThink = card.think.length > 0;
+  const hasAnswer = card.answer.length > 0;
+
+  return (
+    <div style={{
+      background: "#fff",
+      border: "1px solid #e0e0e0",
+      borderRadius: 12,
+      overflow: "hidden",
+      opacity: isStreaming && !hasAnswer ? 0.8 : 1,
+    }}>
+      {hasThink && (
+        <div style={{ borderBottom: hasAnswer ? "1px solid #f0d6a0" : "none" }}>
+          <button
+            onClick={() => setThinkingCollapsed(!thinkingCollapsed)}
+            style={{ width: "100%", display: "flex", alignItems: "center", gap: 8,
+              padding: "8px 14px", background: "#fffbeb", border: "none",
+              cursor: "pointer", fontSize: 13, color: "#92400e", fontWeight: 500 }}
+          >
+            <Sparkles size={14} color="#d97706" />
+            <span style={{ flex: 1, textAlign: "left" }}>
+              {thinkingCollapsed ? "View thinking" : "Hide thinking"}
+            </span>
+            {thinkingCollapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+          </button>
+          {!thinkingCollapsed && (
+            <div style={{ padding: "4px 14px 12px", background: "#fffbeb", fontSize: 13, lineHeight: 1.6, color: "#555" }}>
+              <div className="markdown-body" style={{ fontSize: 13 }}>
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{card.think}</ReactMarkdown>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+      {hasAnswer && (
+        <div style={{ padding: "14px 16px" }}>
+          <div className="markdown-body" style={{ fontSize: 14, lineHeight: 1.7 }}>
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{card.answer}</ReactMarkdown>
+          </div>
+        </div>
+      )}
+      {isStreaming && !hasAnswer && !hasThink && (
+        <div style={{ padding: "14px 16px", display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{ fontSize: 13, color: "#888" }}>AI generating...</span>
+        </div>
+      )}
+      {!isStreaming && isLastCard && responseDoc && (
+        <div style={{ borderTop: "1px solid #e0e0e0", padding: "10px 16px", display: "flex", alignItems: "center", gap: 10, background: "#fafafa" }}>
+          <FileText size={16} color="#666" />
+          <span style={{ flex: 1, fontSize: 13, color: "#333", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {responseDoc.title || "Document"}
+          </span>
+          <a href={responseDocs.exportUrl(responseDoc.id)} target="_blank" rel="noopener noreferrer"
+            style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "#1a73e8", textDecoration: "none", padding: "4px 8px", borderRadius: 4, background: "#e8f0fe" }}>
+            <Download size={12} /> Download
+          </a>
+        </div>
+      )}
     </div>
   );
 }

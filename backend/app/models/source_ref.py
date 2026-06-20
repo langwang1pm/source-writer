@@ -13,8 +13,8 @@ class SourceRef(TimestampMixin, Base):
 
     __mapper_args__ = {"exclude_properties": ["updated_at"]}
 
-    response_doc_id: Mapped[str] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("sourcewriter.response_doc.id"), nullable=False
+    response_doc_id: Mapped[str | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("sourcewriter.response_doc.id"), nullable=True
     )
     message_block_id: Mapped[str | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("sourcewriter.message_block.id"), nullable=True

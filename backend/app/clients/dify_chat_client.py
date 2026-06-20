@@ -22,6 +22,8 @@ class DifyChatClient:
         query: str,
         user: str = "default",
         conversation_id: str | None = None,
+        task_type_id: str | None = None,
+        enterprise_id: str | None = None,
     ) -> AsyncIterator[dict]:
         """Stream chat with Dify Agent API, yielding parsed SSE events."""
         if not self.CHAT_URL:
@@ -34,6 +36,10 @@ class DifyChatClient:
             "response_mode": "streaming",
             "user": user,
         }
+        if task_type_id:
+            payload["inputs"]["tasktypeId"] = task_type_id
+        if enterprise_id:
+            payload["inputs"]["companyId"] = enterprise_id
         if conversation_id:
             payload["conversation_id"] = conversation_id
 
