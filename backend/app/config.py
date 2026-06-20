@@ -31,6 +31,10 @@ class Settings(BaseSettings):
     dify_public_url: str = ""
     dify_office_secret: str = ""
 
+    # Dify Workflow (upload document processing)
+    dify_workflow_api_key: str = ""
+    dify_workflow_app_id: str = ""
+
     # Storage
     upload_dir: str = "./uploads"
 
