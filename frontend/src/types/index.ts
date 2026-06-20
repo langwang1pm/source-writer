@@ -30,6 +30,8 @@ export interface Workspace {
 export interface Session {
   id: string;
   workspace_id: string;
+  task_type_id: string | null;
+  task_type_name: string | null;
   title: string | null;
   created_at: string;
   updated_at: string | null;

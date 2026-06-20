@@ -14,12 +14,20 @@ class Session(TimestampMixin, Base):
     workspace_id: Mapped[str] = mapped_column(
         UUID(as_uuid=True), ForeignKey("sourcewriter.workspace.id"), nullable=False
     )
+    task_type_id: Mapped[str | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("sourcewriter.task_type.id"), nullable=True
+    )
     title: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     # relationships
     workspace: Mapped["Workspace"] = relationship(back_populates="sessions")
+    task_type: Mapped["TaskType | None"] = relationship()
     chat_messages: Mapped[list["ChatMessage"]] = relationship(
         back_populates="session", order_by="ChatMessage.created_at"
     )
     response_docs: Mapped[list["ResponseDoc"]] = relationship(back_populates="session")
     message_blocks: Mapped[list["MessageBlock"]] = relationship(back_populates="session")
+
+    @property
+    def task_type_name(self) -> str | None:
+        return self.task_type.name if self.task_type else None

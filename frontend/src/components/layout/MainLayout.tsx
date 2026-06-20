@@ -1,9 +1,9 @@
 
 import { useState, useEffect } from "react";
 import { Outlet, useParams, useNavigate, useLocation } from "react-router-dom";
-import { MessageSquare, Plus, FolderOpen, LogOut } from "lucide-react";
-import { sessions, workspaces } from "../../api/client";
-import type { Workspace } from "../../types";
+import { MessageSquare, Plus, FolderOpen, LogOut, X } from "lucide-react";
+import { sessions, workspaces, taskTypes } from "../../api/client";
+import type { Workspace, TaskType } from "../../types";
 import type { Session } from "../../types";
 
 export default function MainLayout() {
@@ -15,6 +15,9 @@ export default function MainLayout() {
   const [sessionList, setSessionList] = useState<Session[]>([]);
   const [loading, setLoading] = useState(false);
   const [wsName, setWsName] = useState("");
+  const [showNewDialog, setShowNewDialog] = useState(false);
+  const [availTaskTypes, setAvailTaskTypes] = useState<TaskType[]>([]);
+  const [selectedTaskType, setSelectedTaskType] = useState<string>("");
 
   useEffect(() => {
     if (!workspaceId) return;
@@ -27,12 +30,20 @@ export default function MainLayout() {
   useEffect(() => {
     if (!workspaceId) return;
     workspaces.get(workspaceId).then((w) => setWsName(w.name)).catch(() => {});
+    taskTypes.list({ active_only: true }).then((res) => {
+      setAvailTaskTypes(res.items || []);
+    }).catch(() => {});
   }, [workspaceId]);
 
   const createSession = async () => {
-    if (!workspaceId) return;
-    const res = await sessions.create({ workspace_id: workspaceId });
+    if (!workspaceId || !selectedTaskType) return;
+    const res = await sessions.create({
+      workspace_id: workspaceId,
+      task_type_id: selectedTaskType,
+    });
     setSessionList((prev) => [res, ...prev]);
+    setShowNewDialog(false);
+    setSelectedTaskType("");
     navigate(`/workspace/${workspaceId}/chat/${res.id}`);
   };
 
@@ -66,7 +77,7 @@ export default function MainLayout() {
         <div style={{ height: 1, background: "#e5e5e5", margin: "0 14px" }} />
 
         <div style={{ padding: "10px 14px" }}>
-          <button onClick={createSession} style={{ width: "100%", padding: "9px 0", borderRadius: 8, border: "1px dashed #ccc", background: "transparent", cursor: "pointer", fontSize: 13, color: "#666", display: "flex", alignItems: "center", gap: 6, justifyContent: "center" }}>
+          <button onClick={() => setShowNewDialog(true)} style={{ width: "100%", padding: "9px 0", borderRadius: 8, border: "1px dashed #ccc", background: "transparent", cursor: "pointer", fontSize: 13, color: "#666", display: "flex", alignItems: "center", gap: 6, justifyContent: "center" }}>
             <Plus size={15} />
             新对话
           </button>
@@ -98,6 +109,50 @@ export default function MainLayout() {
         </div>
       </nav>
 
+      {showNewDialog && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+          background: "rgba(0,0,0,0.4)", zIndex: 1000,
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }} onClick={() => setShowNewDialog(false)}>
+          <div style={{
+            background: "#fff", borderRadius: 12, padding: 20,
+            width: 360, maxWidth: "90vw", boxShadow: "0 8px 30px rgba(0,0,0,0.15)",
+          }} onClick={(e) => e.stopPropagation()}>
+            <div style={{display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16}}>
+              <span style={{fontWeight: 600, fontSize: 15}}>New Chat</span>
+              <button onClick={() => setShowNewDialog(false)} style={{background: "none", border: "none", cursor: "pointer", color: "#999", padding: 4}}>
+                <X size={16} />
+              </button>
+            </div>
+            <div style={{fontSize: 13, color: "#666", marginBottom: 10}}>Select task type</div>
+            {availTaskTypes.length === 0 && (
+              <div style={{padding: "20px 0", textAlign: "center", fontSize: 13, color: "#999"}}>
+                No available task types
+              </div>
+            )}
+            {availTaskTypes.map((tt) => (
+              <div key={tt.id} onClick={() => setSelectedTaskType(tt.id)} style={{
+                padding: "10px 12px", borderRadius: 8, cursor: "pointer", fontSize: 13,
+                background: selectedTaskType === tt.id ? "#e8e8f0" : "transparent",
+                color: selectedTaskType === tt.id ? "#1a1a2e" : "#555",
+                marginBottom: 4, transition: "background 0.15s",
+              }}>
+                {tt.name}
+              </div>
+            ))}
+            <button onClick={createSession} disabled={!selectedTaskType} style={{
+              width: "100%", padding: "10px 0", marginTop: 16,
+              borderRadius: 8, border: "none",
+              background: selectedTaskType ? "#1a1a2e" : "#ccc",
+              color: "#fff", cursor: selectedTaskType ? "pointer" : "default",
+              fontSize: 14, fontWeight: 500,
+            }}>
+              Create
+            </button>
+          </div>
+        </div>
+      )}
       <main style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
         <Outlet />
       </main>

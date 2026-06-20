@@ -9,11 +9,14 @@ from pydantic import BaseModel, ConfigDict, Field
 
 class SessionCreate(BaseModel):
     workspace_id: UUID
+    task_type_id: UUID | None = None
 
 
 class SessionResponse(BaseModel):
     id: UUID
     workspace_id: UUID
+    task_type_id: UUID | None = None
+    task_type_name: str | None = None
     title: str | None = None
     created_at: datetime
     updated_at: datetime | None = None

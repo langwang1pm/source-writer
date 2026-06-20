@@ -25,6 +25,8 @@ export default function ChatPage() {
   const [streamingCard, setStreamingCard] = useState<number | null>(null);
   const [citationRefs, setCitationRefs] = useState<SourceRef[]>([]);
   const [showCitation, setShowCitation] = useState(false);
+  const [sessionTitle, setSessionTitle] = useState<string>("");
+  const [sessionTaskType, setSessionTaskType] = useState<string>("");
 
   const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -32,6 +34,10 @@ export default function ChatPage() {
   useEffect(() => {
     if (!sessionId) return;
     loadMessages(sessionId);
+    sessions.get(sessionId).then((s: any) => {
+      setSessionTitle(s.title || "");
+      setSessionTaskType(s.task_type_name || "");
+    }).catch(() => {});
   }, [sessionId]);
 
   const loadMessages = async (sid: string) => {
@@ -185,6 +191,21 @@ export default function ChatPage() {
           </div>
         ) : (
           <>
+            {(sessionTitle || sessionTaskType) && (
+              <div style={{
+                padding: "10px 20px", borderBottom: "1px solid #e5e5e5",
+                background: "#fff", fontSize: 14, fontWeight: 500,
+                display: "flex", alignItems: "center", gap: 8,
+              }}>
+                <span style={{color: "#333"}}>{sessionTitle || "新对话"}</span>
+                {sessionTaskType && (
+                  <span style={{
+                    fontSize: 11, color: "#888", background: "#f0f0f5",
+                    padding: "2px 8px", borderRadius: 4,
+                  }}>{sessionTaskType}</span>
+                )}
+              </div>
+            )}
             <div style={{ flex: 1, overflow: "auto", background: "#f5f5f7" }}>
               {messages.map((msg) => (
                 <MessageCard key={msg.id} role={msg.role} content={msg.content} blocks={msg.blocks} />

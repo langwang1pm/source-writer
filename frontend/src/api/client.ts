@@ -71,7 +71,7 @@ export const sessions = {
     if (params?.workspace_id) q.set("workspace_id", params.workspace_id);
     return request<any>(`/sessions?${q}`);
   },
-  create: (data: { workspace_id: string }) =>
+  create: (data: { workspace_id: string; task_type_id?: string }) =>
     request<any>("/sessions", { method: "POST", body: JSON.stringify(data) }),
   get: (id: string) => request<any>(`/sessions/${id}`),
   delete: (id: string) => request<void>(`/sessions/${id}`, { method: "DELETE" }),
