@@ -39,3 +39,8 @@ a {
 .markdown-body img { max-width: 100%; }
 .markdown-body a { color: #1a73e8; }
 .markdown-body hr { border: none; border-top: 1px solid #ddd; margin: 1em 0; }
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}

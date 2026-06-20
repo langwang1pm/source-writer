@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
-import { Upload, FileText, Trash2, Download, Eye } from "lucide-react";
+import { Upload, FileText, Loader2, Trash2, Download, Eye } from "lucide-react";
 import { uploadedFiles, workspaces } from "../api/client";
 import type { UploadedFile } from "../types";
 
@@ -9,6 +9,7 @@ export default function KnowledgePage() {
   const { workspaceId } = useParams();
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
   const [enterpriseId, setEnterpriseId] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -45,18 +46,20 @@ export default function KnowledgePage() {
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+        setUploading(true);
     const formData = new FormData();
     formData.append("file", file);
     if (enterpriseId) {
       await uploadedFiles.uploadWithEnterprise(formData, enterpriseId);
     }
-    loadFiles(enterpriseId);
+        await loadFiles(enterpriseId);
     if (fileInputRef.current) fileInputRef.current.value = "";
+        setUploading(false);
   };
 
   const handleDelete = async (id: string) => {
     await uploadedFiles.delete(id);
-    loadFiles(enterpriseId);
+        await loadFiles(enterpriseId);
   };
 
   const statusColor = (s: string) => {
@@ -101,8 +104,8 @@ export default function KnowledgePage() {
           onClick={() => fileInputRef.current?.click()}
           style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 8, border: "none", background: "#1a1a2e", color: "#fff", cursor: "pointer", fontSize: 14 }}
         >
-          <Upload size={16} />
-          上传文件
+                    {uploading ? <Loader2 size={16} style={{animation: "spin 1s linear infinite"}} /> : <Upload size={16} />}
+                    {uploading ? "上传中..." : "上传文件"}
         </button>
         <input
           ref={fileInputRef}
