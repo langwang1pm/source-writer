@@ -56,6 +56,7 @@ class StreamService:
         self.all_blocks: list[MessageBlock] = []
         self._agent_buf: str = ""
         self._pending_refs: list[dict] | None = None
+        self.all_source_refs: list[SourceRef] = []
 
     async def stream(self, query: str) -> AsyncGenerator[str, None]:
         """Main streaming loop. Yields SSE-formatted strings for the frontend."""
@@ -132,7 +133,11 @@ class StreamService:
                 if self.current_card:
                     await self._flush_card()
                 # Build response doc from all cards
-                await self._on_message_end(event)
+                try:
+                    await self._on_message_end(event)
+                except Exception as e:
+                    import logging
+                    logging.error("_on_message_end error: %s", e, exc_info=True)
                 yield self._sse("done", {"status": "ok"})
 
             elif event_type == "error":
@@ -217,6 +222,7 @@ class StreamService:
                                 char_position=ref["char_position"],
                             )
                             self.db.add(sr)
+                            self.all_source_refs.append(sr)
 
                 await self.db.flush()
                 self.current_card = None
@@ -279,6 +285,7 @@ class StreamService:
                     char_position=ref["char_position"],
                 )
                 self.db.add(sr)
+                self.all_source_refs.append(sr)
                 refs_data.append({
                     "ordinal": ref["ordinal"],
                     "source_name": ref["source_name"],
@@ -320,7 +327,7 @@ class StreamService:
 
         # Back-fill source_ref.response_doc_id
         for blk in self.all_blocks:
-            for sr in blk.source_refs:
+            for sr in self.all_source_refs:
                 sr.response_doc_id = doc.id
 
         await self.db.commit()
