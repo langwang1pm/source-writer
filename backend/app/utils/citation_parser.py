@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import re
 
-CITATION_PATTERN = re.compile(r"【引用来源：(.+?)】")
+CITATION_PATTERN = re.compile(r"【引用来源[：:](.+?)】", re.DOTALL)
 
 
 def parse_citations(text: str, card_ordinal: int) -> list[dict]:

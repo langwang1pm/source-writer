@@ -51,13 +51,14 @@ export default function MessageInput({ onSend, disabled }: Props) {
         style={{
           flex: 1,
           resize: "none",
+          overflow: "hidden",
           padding: "10px 14px",
           borderRadius: 8,
           border: "1px solid #d0d0d0",
           fontSize: 14,
           lineHeight: 1.5,
           outline: "none",
-          maxHeight: 200,
+          maxHeight: 300,
         }}
       />
       <button

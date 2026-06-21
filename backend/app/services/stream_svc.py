@@ -175,6 +175,36 @@ class StreamService:
             think_matches = list(re.finditer(r'<think>(.*?)</think>', full, re.DOTALL))
 
             if len(think_matches) > 1:
+                # Handle text before the first <think> tag (would be lost otherwise)
+                first_start = think_matches[0].start()
+                if first_start > 0:
+                    before_think = full[:first_start]
+                    if before_think.strip():
+                        citations = parse_citations(before_think, card.card_ordinal)
+                        self.global_ordinal += 1
+                        blk = MessageBlock(
+                            session_id=self.session_id,
+                            user_message_id=self.user_message_id,
+                            card_ordinal=card.card_ordinal,
+                            block_type="answer",
+                            content=before_think,
+                            ordinal=self.global_ordinal,
+                        )
+                        self.db.add(blk)
+                        self.all_blocks.append(blk)
+                        await self.db.flush()
+                        for ref in citations:
+                            sr = SourceRef(
+                                response_doc_id=None,
+                                message_block_id=blk.id,
+                                card_ordinal=card.card_ordinal,
+                                ordinal=ref["ordinal"],
+                                source_name=ref["source_name"],
+                                char_position=ref["char_position"],
+                            )
+                            self.db.add(sr)
+                            self.all_source_refs.append(sr)
+
                 for i, match in enumerate(think_matches):
                     think_content = match.group(1)
                     end_pos = match.end()

@@ -8,7 +8,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 export default function DocumentPage() {
-  const { docId } = useParams();
+  const { workspaceId, docId } = useParams();
   const [doc, setDoc] = useState<ResponseDoc | null>(null);
   const [editing, setEditing] = useState(false);
   const [markdown, setMarkdown] = useState("");
@@ -42,7 +42,7 @@ export default function DocumentPage() {
       {/* Toolbar */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 20px", borderBottom: "1px solid #e0e0e0", background: "#fff" }}>
         <a
-          href={`/workspace/${doc.session_id}/chat`}
+          href={`/workspace/${workspaceId}/chat/${doc.session_id}`}
           style={{ display: "flex", alignItems: "center", gap: 4, color: "#666", textDecoration: "none", fontSize: 13 }}
         >
           <ArrowLeft size={16} />

@@ -1,10 +1,12 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
-import { sessions, messages as messagesApi, messageBlocks, responseDocs } from "../api/client";
+import { sessions, messages as messagesApi, messageBlocks, responseDocs, sourceRefs } from "../api/client";
 import { useSSE } from "../hooks/useSSE";
+import { BookOpen } from "lucide-react";
 import MessageCard from "../components/chat/MessageCard";
 import MessageInput from "../components/chat/MessageInput";
+import CitationPanel from "../components/layout/CitationPanel";
 import type { ChatMessage, MessageBlock, SourceRef, ResponseDoc } from "../types";
 
 interface DisplayMessage {
@@ -24,7 +26,8 @@ export default function ChatPage() {
   const [streamBlocks, setStreamBlocks] = useState<MessageBlock[]>([]);
   const [streamingCard, setStreamingCard] = useState<number | null>(null);
   const [citationRefs, setCitationRefs] = useState<SourceRef[]>([]);
-  const [showCitation, setShowCitation] = useState(false);
+  const [showCitation, setShowCitation] = useState(true);
+  const [activeCitationIndex, setActiveCitationIndex] = useState<number | null>(null);
   const [sessionTitle, setSessionTitle] = useState<string>("");
   const [sessionTaskType, setSessionTaskType] = useState<string>("");
 
@@ -33,6 +36,10 @@ export default function ChatPage() {
   // Load messages for active session
   useEffect(() => {
     if (!sessionId) return;
+    // Clear temporary states when switching sessions
+    setStreamBlocks([]);
+    setStreamingCard(null);
+    setCitationRefs([]);
     loadMessages(sessionId);
     sessions.get(sessionId).then((s: any) => {
       setSessionTitle(s.title || "");
@@ -41,19 +48,28 @@ export default function ChatPage() {
   }, [sessionId]);
 
   const loadMessages = async (sid: string) => {
+    setCitationRefs([]);
     try {
       const res = await messagesApi.list(sid);
       const msgList: DisplayMessage[] = [];
 
+      // Fetch all response docs for this session once
+      const docsRes = await responseDocs.list({ session_id: sid });
+      const docs: ResponseDoc[] = docsRes.items || [];
+
+      // Load source refs for citations panel (from latest response doc)
+      let latestDocId: string | null = null;
+ 
       for (const msg of (res.items || []) as ChatMessage[]) {
         msgList.push({ id: msg.id, role: "user", content: msg.content });
 
         const blocksRes = await messageBlocks.list(msg.id);
         const blocks: MessageBlock[] = blocksRes || [];
 
-        const docsRes = await responseDocs.list({ session_id: sid });
-        const docs: ResponseDoc[] = docsRes.items || [];
         const doc = docs.find((d) => d.chat_message_id === msg.id);
+        if (doc && !latestDocId) {
+          latestDocId = doc.id;
+        }
 
         msgList.push({
           id: `resp-${msg.id}`,
@@ -63,6 +79,14 @@ export default function ChatPage() {
         });
       }
       setMessages(msgList);
+ 
+      // Populate citation panel from the latest response doc's source refs
+      if (latestDocId) {
+        try {
+          const refsRes = await sourceRefs.list(latestDocId);
+          setCitationRefs(refsRes.items || []);
+        } catch {}
+      }
     } catch {}
   };
 
@@ -168,6 +192,8 @@ export default function ChatPage() {
       },
       onDone: () => {
         setStreamingCard(null);
+        setStreamBlocks([]);
+        setCitationRefs([]);
         if (sessionId) loadMessages(sessionId);
       },
       onError: (err) => {
@@ -177,14 +203,19 @@ export default function ChatPage() {
     });
   }, [workspaceId, sessionId, isStreaming, startStream]);
 
+  const handleCitationClick = useCallback((sourceName: string) => {
+    const idx = citationRefs.findIndex((r) => r.source_name === sourceName || r.source_name.includes(sourceName));
+    if (idx >= 0) {
+      setActiveCitationIndex(idx);
+    }
+  }, [citationRefs]);
+
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, streamBlocks]);
 
   return (
-    <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
-      {/* Chat area */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+    <div style={{ display: "flex", flexDirection: "column", flex: 1, overflow: "hidden" }}>
         {!sessionId ? (
           <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "#999", fontSize: 14 }}>
             从左侧选择一个对话，或创建新对话
@@ -193,25 +224,49 @@ export default function ChatPage() {
           <>
             {(sessionTitle || sessionTaskType) && (
               <div style={{
-                padding: "10px 20px", borderBottom: "1px solid #e5e5e5",
+                padding: "10px 16px", borderBottom: "1px solid #e5e5e5",
                 background: "#fff", fontSize: 14, fontWeight: 500,
-                display: "flex", alignItems: "center", gap: 8,
+                display: "flex", alignItems: "center", gap: 10,
               }}>
-                <span style={{color: "#333"}}>{sessionTitle || "新对话"}</span>
+                <span style={{color: "#333", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap"}}>{sessionTitle || "新对话"}</span>
                 {sessionTaskType && (
                   <span style={{
                     fontSize: 11, color: "#888", background: "#f0f0f5",
                     padding: "2px 8px", borderRadius: 4,
                   }}>{sessionTaskType}</span>
                 )}
+                <button
+                  onClick={() => setShowCitation(!showCitation)}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 4,
+                    fontSize: 12, color: showCitation ? "#6c5ce7" : "#888",
+                    background: showCitation ? "#f0edff" : "transparent",
+                    border: "1px solid", borderColor: showCitation ? "#d4ccf5" : "#ddd",
+                    borderRadius: 6, padding: "4px 10px", cursor: "pointer",
+                    fontWeight: 500, transition: "all 0.15s",
+                  }}
+                >
+                  <BookOpen size={13} />
+                  引用来源
+                  {citationRefs.length > 0 && (
+                    <span style={{
+                      fontSize: 10, background: showCitation ? "#6c5ce7" : "#999",
+                      color: "#fff", borderRadius: 8, padding: "0 5px",
+                      lineHeight: "16px", fontWeight: 600,
+                    }}>
+                      {citationRefs.length}
+                    </span>
+                  )}
+                </button>
               </div>
             )}
-            <div style={{ flex: 1, overflow: "auto", background: "#f5f5f7" }}>
+            <div style={{ display: "flex", flex: 1, overflow: "hidden", position: "relative" }}>
+              <div style={{ flex: 1, overflow: "auto", background: "#f5f5f7" }}>
               {messages.map((msg) => (
-                <MessageCard key={msg.id} role={msg.role} content={msg.content} blocks={msg.blocks} responseDoc={msg.responseDoc} />
+                <MessageCard key={msg.id} role={msg.role} content={msg.content} blocks={msg.blocks} responseDoc={msg.responseDoc} onCitationClick={handleCitationClick} workspaceId={workspaceId} />
               ))}
               {streamBlocks.length > 0 && (
-                <MessageCard role="assistant" blocks={streamBlocks} streamingCard={streamingCard} />
+                <MessageCard role="assistant" blocks={streamBlocks} streamingCard={streamingCard} onCitationClick={handleCitationClick} workspaceId={workspaceId} />
               )}
               {isStreaming && (
                 <div style={{ padding: "16px 20px 16px 72px", fontSize: 13, color: "#888" }}>
@@ -220,23 +275,17 @@ export default function ChatPage() {
               )}
               <div ref={chatEndRef} />
             </div>
+              {/* Citation panel */}
+              <CitationPanel
+                citations={citationRefs}
+                isOpen={showCitation}
+                onToggle={() => setShowCitation(!showCitation)}
+                activeIndex={activeCitationIndex}
+              />
+            </div>
             <MessageInput onSend={handleSend} disabled={isStreaming} />
           </>
         )}
-      </div>
-
-      {/* Citation panel */}
-      {citationRefs.length > 0 && (
-        <div style={{ width: 300, borderLeft: "1px solid #e0e0e0", background: "#fafafa", padding: 12, overflow: "auto" }}>
-          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: "#333" }}>引用来源</div>
-          {citationRefs.map((ref, i) => (
-            <div key={i} style={{ fontSize: 12, padding: "8px 10px", marginBottom: 6, background: "#fff", borderRadius: 8, border: "1px solid #eee" }}>
-              <div style={{ fontWeight: 500, color: "#333", marginBottom: 2 }}>{ref.source_name}</div>
-              {ref.snippet && <div style={{ color: "#888", fontSize: 11 }}>{ref.snippet.slice(0, 100)}...</div>}
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
