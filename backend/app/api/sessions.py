@@ -102,7 +102,12 @@ async def update_session(
     if body.title is not None:
         session.title = body.title
     await db.commit()
-    await db.refresh(session)
+    from sqlalchemy.orm import selectinload
+    from sqlalchemy import select
+    result = await db.execute(
+        select(Session).options(selectinload(Session.task_type)).where(Session.id == session.id)
+    )
+    session = result.scalar_one()
     return session
 
 

@@ -55,6 +55,10 @@ export default function MainLayout() {
     if (!window.confirm("确定删除此对话？")) return;
     await sessions.delete(id);
     setSessionList((prev) => prev.filter((s) => s.id !== id));
+    // If deleting the currently active session, clear the chat view
+    if (id === sessionId) {
+      navigate(`/workspace/${workspaceId}/chat`);
+    }
   };
 
   const createSession = async () => {
