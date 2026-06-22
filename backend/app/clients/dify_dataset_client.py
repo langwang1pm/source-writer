@@ -66,7 +66,7 @@ class DifyDatasetClient:
             "embedding_model_provider": settings.dify_embedding_model_provider,
         }
 
-        timeout = httpx.Timeout(300.0, connect=10.0, read=300.0)
+        timeout = httpx.Timeout(600.0, connect=30.0, read=600.0)
         async with httpx.AsyncClient(timeout=timeout) as client:
             with open(file_path, "rb") as f:
                 files = {"file": (file_name, f, "application/octet-stream")}

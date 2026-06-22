@@ -1,5 +1,4 @@
-
-const BASE = "/api/v1";
+﻿const BASE = "/api/v1";
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
@@ -128,12 +127,16 @@ export const uploadedFiles = {
   },
   refreshStatus: (id: string) =>
     request<any>(`/uploaded-files/${id}/refresh-status`, { method: "POST" }),
+  /** Phase 1: Upload file to local server only (returns immediately after local save) */
   upload: (formData: FormData) =>
     fetch(`${BASE}/uploaded-files`, { method: "POST", body: formData }),
   uploadWithEnterprise: (formData: FormData, enterpriseId: string) =>
     fetch(`${BASE}/uploaded-files?enterprise_id=${enterpriseId}`, { method: "POST", body: formData }),
+  /** Phase 2: Sync an already-uploaded local file to Dify knowledge base */
+  syncToDify: (fileId: string) =>
+    request<any>(`/uploaded-files/${fileId}/sync-to-dify`, { method: "POST" }),
   delete: (id: string) => request<void>(`/uploaded-files/${id}`, { method: "DELETE" }),
   downloadUrl: (id: string) => `${BASE}/uploaded-files/${id}/download`,
-    previewUrl: (id: string) => `${BASE}/uploaded-files/${id}/preview`,
-    officePreviewUrl: (id: string) => `${BASE}/uploaded-files/${id}/office-preview`,
+  previewUrl: (id: string) => `${BASE}/uploaded-files/${id}/preview`,
+  officePreviewUrl: (id: string) => `${BASE}/uploaded-files/${id}/office-preview`,
 };

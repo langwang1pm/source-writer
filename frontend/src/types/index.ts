@@ -1,5 +1,4 @@
-
-// === Backend model types ===
+﻿// === Backend model types ===
 
 export interface ClientEnterprise {
   id: string;
@@ -90,10 +89,26 @@ export interface UploadedFile {
   file_name: string;
   file_size: number;
   mime_type: string | null;
-  status: "pending" | "indexing" | "available" | "error";
+  status: string;
   created_at: string;
   updated_at: string | null;
 }
+
+/** UploadFileStatus constants matching backend model */
+export const UPLOAD_FILE_STATUS = {
+  LOCAL_UPLOADING: "本地文件上传中",
+  LOCAL_COMPLETED: "本地文件上传已完成",
+  DIFY_SYNCING: "文件同步dify知识库中",
+  WAITING: "waiting",
+  PARSING: "parsing",
+  CLEANING: "cleaning",
+  SPLITTING: "splitting",
+  INDEXING: "indexing",
+  COMPLETED: "已完成",
+  ERROR: "error",
+} as const;
+
+export type UploadFileStatusType = (typeof UPLOAD_FILE_STATUS)[keyof typeof UPLOAD_FILE_STATUS];
 
 // === Pagination ===
 
@@ -110,7 +125,7 @@ export interface PaginatedResponse<T> {
 export type SSEEvent =
   | { event: "think_delta"; data: { card_ordinal: number; delta: string } }
   | { event: "answer_delta"; data: { card_ordinal: number; delta: string } }
-  | { event: "citation_update"; data: { card_ordinal: number; refs: { ordinal: number; source_name: string; char_position: number }[] } }
+  | { event: "citation_update"; data: { card_ordinal: number; refs: { ordinal: number; source_name: number; char_position: number }[] } }
   | { event: "done"; data: { status: string } }
   | { event: "error"; data: { message: string } }
   | { event: "ping"; data: {} }

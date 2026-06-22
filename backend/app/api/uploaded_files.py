@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -10,8 +9,7 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.models.uploaded_file import UploadedFile
-from sqlalchemy import select, func
+from app.models.uploaded_file import UploadedFile, UploadFileStatus
 from app.schemas.uploaded_file import (
     UploadedFileResponse, UploadedFileListResponse, UploadedFileCreateResponse,
 )
@@ -40,10 +38,11 @@ async def list_uploaded_files(
         .limit(page_size)
     )
     items = result.scalars().all()
-    # Sync non-final statuses from Dify (in-memory only)
+    # Sync non-final Dify statuses from Dify (in-memory only)
     import httpx, asyncio
     from app.config import settings
-    dify_h = {'Authorization': 'Bearer ' + (settings.dify_dataset_api_key or settings.dify_app_api_key)}
+    from app.services.upload_svc import _map_dify_status
+    dify_h = {"Authorization": "Bearer " + (settings.dify_dataset_api_key or settings.dify_app_api_key)}
     async def _fetch(f):
         try:
             url = settings.dify_base_url + "/v1/datasets/" + settings.dify_dataset_id + "/documents/" + f.dify_document_id
@@ -51,13 +50,20 @@ async def list_uploaded_files(
                 r = await c.get(url, headers=dify_h, timeout=10)
                 if r.status_code == 200:
                     s = r.json().get("indexing_status")
-                    if s and s != f.status:
-                        f.status = s
+                    if s:
+                        mapped = _map_dify_status(s)
+                        if mapped != f.status:
+                            f.status = mapped
         except:
             pass
     tasks = []
+    # Refresh for files that:
+    # 1. Have a dify_document_id AND
+    # 2. Status is not terminal (已完成/error) AND
+    # 3. Status is not a local-phase status (本地文件上传中/已完成/文件同步dify知识库中)
+    local_statuses = {UploadFileStatus.LOCAL_UPLOADING, UploadFileStatus.LOCAL_COMPLETED, UploadFileStatus.DIFY_SYNCING}
     for f in items:
-        if f.dify_document_id and f.status not in ("available", "completed", "error"):
+        if f.dify_document_id and f.status not in (UploadFileStatus.COMPLETED, UploadFileStatus.ERROR) and f.status not in local_statuses:
             tasks.append(_fetch(f))
     if tasks:
         await asyncio.gather(*tasks)
@@ -73,9 +79,10 @@ async def create_uploaded_file(
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
 ):
-    from app.services.upload_svc import upload_file
+    """Phase 1: Upload file to local server storage only."""
+    from app.services.upload_svc import upload_file_local
     try:
-        uploaded = await upload_file(db, file, enterprise_id)
+        uploaded = await upload_file_local(db, file, enterprise_id)
     except ValueError as e:
         raise HTTPException(400, detail=str(e))
     return UploadedFileCreateResponse(
@@ -87,9 +94,31 @@ async def create_uploaded_file(
     )
 
 
+@router.post("/{file_id}/sync-to-dify", response_model=UploadedFileResponse)
+async def sync_file_to_dify(
+    file_id: UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    """Phase 2: Sync an already-uploaded local file to Dify knowledge base."""
+    from app.services.upload_svc import sync_to_dify
+    result = await db.execute(
+        select(UploadedFile).where(
+            UploadedFile.id == file_id,
+            UploadedFile.deleted_at.is_(None),
+        )
+    )
+    f = result.scalar_one_or_none()
+    if not f:
+        raise HTTPException(404, detail="File not found")
+    try:
+        updated = await sync_to_dify(db, f)
+    except ValueError as e:
+        raise HTTPException(400, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(500, detail=str(e))
+    return updated
 
 
- 
 @router.get("/{file_id}", response_model=UploadedFileResponse)
 async def get_uploaded_file(file_id: UUID, db: AsyncSession = Depends(get_db)):
     result = await db.execute(
@@ -170,7 +199,6 @@ async def preview_uploaded_file(file_id: UUID, db: AsyncSession = Depends(get_db
     )
 
 
-
 @router.get("/{file_id}/office-preview")
 async def office_preview_file(file_id: UUID, request: Request, db: AsyncSession = Depends(get_db)):
     """Preview a file using OnlyOffice Document Server."""
@@ -182,7 +210,7 @@ async def office_preview_file(file_id: UUID, request: Request, db: AsyncSession 
     f = result.scalar_one_or_none()
     if not f:
         raise HTTPException(404, detail="File not found")
-    base_url = settings.dify_public_url or str(request.base_url).rstrip('/')
+    base_url = settings.dify_public_url or str(request.base_url).rstrip("/")
     doc_url = base_url + "/api/v1/uploaded-files/" + str(file_id) + "/download"
     onlyoffice_url = settings.dify_office_base_url or "http://192.168.2.121:8080"
     ext = f.file_name.split(".")[-1].lower() if "." in f.file_name else ""
@@ -202,12 +230,12 @@ async def office_preview_file(file_id: UUID, request: Request, db: AsyncSession 
     if settings.dify_office_secret:
         dc["token"] = jwt.encode(dc, settings.dify_office_secret, algorithm="HS256")
     cjson = json.dumps(dc, ensure_ascii=False)
-    h  = '<!DOCTYPE html><html><head><meta charset=utf-8>'
+    h  = "<!DOCTYPE html><html><head><meta charset=utf-8>"
     h += '<script src="' + onlyoffice_url + '/web-apps/apps/api/documents/api.js"></script>'
-    h += '</head><body style=margin:0;height:100vh>'
+    h += "</head><body style=margin:0;height:100vh>"
     h += '<div id=placeholder style=height:100%></div><script>'
-    h += 'new DocsAPI.DocEditor("placeholder",' + cjson + ');'
-    h += '</script></body></html>'
+    h += 'new DocsAPI.DocEditor("placeholder",' + cjson + ");"
+    h += "</script></body></html>"
     return HTMLResponse(content=h)
 
 
