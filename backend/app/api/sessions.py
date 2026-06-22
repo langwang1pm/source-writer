@@ -14,7 +14,7 @@ from app.models.workspace import Workspace
 from app.models.chat_message import ChatMessage
 from app.models.task_type import TaskType
 from app.schemas.session import (
-    SessionCreate, SessionResponse, SessionListResponse,
+    SessionCreate, SessionUpdate, SessionResponse, SessionListResponse,
 )
 
 router = APIRouter(prefix="/api/v1/sessions", tags=["Sessions"])
@@ -81,6 +81,28 @@ async def get_session(session_id: UUID, db: AsyncSession = Depends(get_db)):
     session = result.scalar_one_or_none()
     if not session:
         raise HTTPException(404, detail="Session not found")
+    return session
+
+
+@router.put("/{session_id}", response_model=SessionResponse)
+async def update_session(
+    session_id: UUID,
+    body: SessionUpdate,
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(Session).where(
+            Session.id == session_id,
+            Session.deleted_at.is_(None),
+        )
+    )
+    session = result.scalar_one_or_none()
+    if not session:
+        raise HTTPException(404, detail="Session not found")
+    if body.title is not None:
+        session.title = body.title
+    await db.commit()
+    await db.refresh(session)
     return session
 
 

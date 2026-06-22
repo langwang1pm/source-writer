@@ -74,6 +74,8 @@ export const sessions = {
   create: (data: { workspace_id: string; task_type_id?: string }) =>
     request<any>("/sessions", { method: "POST", body: JSON.stringify(data) }),
   get: (id: string) => request<any>(`/sessions/${id}`),
+  update: (id: string, data: { title?: string }) =>
+    request<any>(`/sessions/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   delete: (id: string) => request<void>(`/sessions/${id}`, { method: "DELETE" }),
 };
 

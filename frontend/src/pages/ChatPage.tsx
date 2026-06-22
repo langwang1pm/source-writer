@@ -228,7 +228,7 @@ export default function ChatPage() {
                 background: "#fff", fontSize: 14, fontWeight: 500,
                 display: "flex", alignItems: "center", gap: 10,
               }}>
-                <span style={{color: "#333", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap"}}>{sessionTitle || "新对话"}</span>
+                <span style={{color: "#333", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "40%"}}>{sessionTitle || "新对话"}</span>
                 {sessionTaskType && (
                   <span style={{
                     fontSize: 11, color: "#888", background: "#f0f0f5",
@@ -237,7 +237,7 @@ export default function ChatPage() {
                 )}
                 <button
                   onClick={() => setShowCitation(!showCitation)}
-                  style={{
+                  style={{marginLeft: "auto",
                     display: "flex", alignItems: "center", gap: 4,
                     fontSize: 12, color: showCitation ? "#6c5ce7" : "#888",
                     background: showCitation ? "#f0edff" : "transparent",

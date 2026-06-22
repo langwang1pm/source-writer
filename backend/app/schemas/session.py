@@ -12,6 +12,9 @@ class SessionCreate(BaseModel):
     task_type_id: UUID | None = None
 
 
+class SessionUpdate(BaseModel):
+    title: str | None = None
+ 
 class SessionResponse(BaseModel):
     id: UUID
     workspace_id: UUID

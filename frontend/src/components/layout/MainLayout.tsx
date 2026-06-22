@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from "react";
 import { Outlet, useParams, useNavigate, useLocation, useSearchParams } from "react-router-dom";
-import { MessageSquare, Plus, FolderOpen, LogOut, X } from "lucide-react";
+import { MessageSquare, Plus, FolderOpen, LogOut, X, Pencil, Trash2 } from "lucide-react";
 import { sessions, workspaces, taskTypes } from "../../api/client";
 import type { Workspace, TaskType } from "../../types";
 import type { Session } from "../../types";
@@ -19,6 +19,8 @@ export default function MainLayout() {
   const [showNewDialog, setShowNewDialog] = useState(false);
   const [availTaskTypes, setAvailTaskTypes] = useState<TaskType[]>([]);
   const [selectedTaskType, setSelectedTaskType] = useState<string>("");
+  const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
 
   useEffect(() => {
     if (!workspaceId) return;
@@ -37,6 +39,24 @@ export default function MainLayout() {
   }, [workspaceId]);
 
   const activeSessionId = sessionId || searchParams.get("sessionId") || "";
+  const handleRename = (s: Session) => {
+    setEditingSessionId(s.id);
+    setEditTitle(s.title || "");
+  };
+
+  const handleRenameSave = async (id: string) => {
+    if (!editTitle.trim()) return;
+    await sessions.update(id, { title: editTitle.trim() });
+    setSessionList((prev) => prev.map((s) => (s.id === id ? { ...s, title: editTitle.trim() } : s)));
+    setEditingSessionId(null);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!window.confirm("确定删除此对话？")) return;
+    await sessions.delete(id);
+    setSessionList((prev) => prev.filter((s) => s.id !== id));
+  };
+
   const createSession = async () => {
     if (!workspaceId || !selectedTaskType) return;
     const res = await sessions.create({
@@ -91,14 +111,62 @@ export default function MainLayout() {
             <div style={{ padding: "16px", textAlign: "center", fontSize: 13, color: "#999" }}>暂无对话，点击上方按钮创建</div>
           )}
           {sessionList.map((s) => (
-            <div key={s.id} onClick={() => navigate(`/workspace/${workspaceId}/chat/${s.id}`)} style={{
-              padding: "10px 12px", borderRadius: 8, marginBottom: 2, cursor: "pointer", fontSize: 13,
-              color: s.id === activeSessionId ? "#1a1a2e" : "#555",
+            <div key={s.id} style={{
+              display: "flex", alignItems: "center", borderRadius: 8, marginBottom: 2,
               background: s.id === activeSessionId ? "#e8e8f0" : "transparent",
-              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-            }}>
-              <MessageSquare size={14} style={{ marginRight: 6, verticalAlign: "middle", opacity: 0.6 }} />
-              {s.title || "新对话"}
+              transition: "background 0.15s",
+            }}
+              onMouseEnter={(e) => { const b = e.currentTarget.querySelector('.ses-actions') as HTMLElement; if (b) b.style.opacity = '1'; }}
+              onMouseLeave={(e) => { const b = e.currentTarget.querySelector('.ses-actions') as HTMLElement; if (b) b.style.opacity = '0'; }}
+            >
+              {editingSessionId === s.id ? (
+                <input
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleRenameSave(s.id);
+                    if (e.key === "Escape") setEditingSessionId(null);
+                  }}
+                  onBlur={() => handleRenameSave(s.id)}
+                  autoFocus
+                  style={{
+                    flex: 1, margin: "6px 8px", padding: "4px 8px", borderRadius: 4,
+                    border: "1px solid #d4ccf5", fontSize: 13, outline: "none",
+                    background: "#fff",
+                  }}
+                />
+              ) : (
+                <div
+                  onClick={() => navigate(`/workspace/${workspaceId}/chat/${s.id}`)}
+                  style={{
+                    flex: 1, padding: "10px 12px", cursor: "pointer", fontSize: 13,
+                    color: s.id === activeSessionId ? "#1a1a2e" : "#555",
+                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                  }}
+                >
+                  <MessageSquare size={14} style={{ marginRight: 6, verticalAlign: "middle", opacity: 0.6 }} />
+                  {s.title || "新对话"}
+                </div>
+              )}
+              <div className="ses-actions" style={{
+                display: "flex", gap: 2, paddingRight: 6, opacity: 0,
+                transition: "opacity 0.12s",
+              }}>
+                <button
+                  onClick={() => handleRename(s)}
+                  title="重命名"
+                  style={{ padding: 4, borderRadius: 4, border: "none", background: "transparent", cursor: "pointer", color: "#666", lineHeight: 0 }}
+                >
+                  <Pencil size={13} />
+                </button>
+                <button
+                  onClick={() => handleDelete(s.id)}
+                  title="删除"
+                  style={{ padding: 4, borderRadius: 4, border: "none", background: "transparent", cursor: "pointer", color: "#e74c3c", lineHeight: 0 }}
+                >
+                  <Trash2 size={13} />
+                </button>
+              </div>
             </div>
           ))}
         </div>
