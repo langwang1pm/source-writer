@@ -218,7 +218,7 @@ function CardItem({ card, isStreaming, isLastCard, responseDoc, onCitationClick,
             )}
           </span>
           <a
-            href={`/workspace/${workspaceId}/docs/${responseDoc.id}`}
+            href={`/workspace/${workspaceId}/docs/${responseDoc.id}?sessionId=${responseDoc.session_id}`}
             style={{
               display: "flex", alignItems: "center", gap: 4,
               fontSize: 12, color: "#6c5ce7", textDecoration: "none",

@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from "react";
-import { Outlet, useParams, useNavigate, useLocation } from "react-router-dom";
+import { Outlet, useParams, useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { MessageSquare, Plus, FolderOpen, LogOut, X } from "lucide-react";
 import { sessions, workspaces, taskTypes } from "../../api/client";
 import type { Workspace, TaskType } from "../../types";
@@ -8,6 +8,7 @@ import type { Session } from "../../types";
 
 export default function MainLayout() {
   const { workspaceId, sessionId } = useParams();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const location = useLocation();
   const isKnowledge = location.pathname.includes("/knowledge");
@@ -35,6 +36,7 @@ export default function MainLayout() {
     }).catch(() => {});
   }, [workspaceId]);
 
+  const activeSessionId = sessionId || searchParams.get("sessionId") || "";
   const createSession = async () => {
     if (!workspaceId || !selectedTaskType) return;
     const res = await sessions.create({
@@ -91,8 +93,8 @@ export default function MainLayout() {
           {sessionList.map((s) => (
             <div key={s.id} onClick={() => navigate(`/workspace/${workspaceId}/chat/${s.id}`)} style={{
               padding: "10px 12px", borderRadius: 8, marginBottom: 2, cursor: "pointer", fontSize: 13,
-              color: s.id === sessionId ? "#1a1a2e" : "#555",
-              background: s.id === sessionId ? "#e8e8f0" : "transparent",
+              color: s.id === activeSessionId ? "#1a1a2e" : "#555",
+              background: s.id === activeSessionId ? "#e8e8f0" : "transparent",
               overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
             }}>
               <MessageSquare size={14} style={{ marginRight: 6, verticalAlign: "middle", opacity: 0.6 }} />
@@ -159,3 +161,4 @@ export default function MainLayout() {
     </div>
   );
 }
+  // Use route param sessionId, or query param (for doc page)
