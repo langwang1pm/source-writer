@@ -115,7 +115,7 @@ def _markdown_to_docx(markdown_text: str, title: str):
     esc = saxutils.escape
     lines = markdown_text.split('\n')
     body_parts = []
-    body_parts.append('<w:body xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">')
+    body_parts.append('<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>')
     body_parts.append('<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/></w:sectPr>')
     
     # Title as heading 1
@@ -136,7 +136,7 @@ def _markdown_to_docx(markdown_text: str, title: str):
         else:
             body_parts.append(_docx_paragraph(esc(s)))
     
-    body_parts.append('</w:body>')
+    body_parts.append('</w:body></w:document>')
     document_xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' + ''.join(body_parts)
     
     content_types = (
