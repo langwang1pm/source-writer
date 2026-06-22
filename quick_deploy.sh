@@ -1,4 +1,4 @@
-﻿#!/bin/bash
+#!/bin/bash
 # ============================================================
 # source-writer  Production Deployment Script
 # Usage:  ./quick_deploy.sh
@@ -22,9 +22,9 @@ log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
 echo ""
 echo "============================================"
-echo "  Time: $(date '+%Y-%m-%d %H:%M:%S')"
+echo "  source-writer  Production Deployment"
 echo "  Architecture: $(uname -m)"
-echo '  Time: '
+echo "  Time: $(date '+%Y-%m-%d %H:%M:%S')"
 echo "============================================"
 echo ""
 
