@@ -4,13 +4,19 @@
  # ============================================
 
  # ---------- 依赖安装阶段 ----------
- FROM python:3.13-slim AS builder
+FROM python:3.13-slim AS builder
 
- WORKDIR /app
+WORKDIR /app
 
- COPY requirements.txt .
- RUN pip install --no-cache-dir -r requirements.txt \
-     -i https://pypi.tuna.tsinghua.edu.cn/simple \
+ # asyncpg 等 C 扩展在 ARM64 上无预编译 wheel，需安装编译工具
+ RUN apt-get update && apt-get install -y --no-install-recommends \
+     gcc \
+     libc6-dev \
+     && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt \
+    -i https://pypi.tuna.tsinghua.edu.cn/simple \
      --trusted-host pypi.tuna.tsinghua.edu.cn
 
  # ---------- 最终运行阶段 ----------
