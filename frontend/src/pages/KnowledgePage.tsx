@@ -64,8 +64,8 @@ export default function KnowledgePage() {
 
   /** Check if a status is a Dify-related non-terminal (needs polling) */
   const isDifyActiveStatus = (status: string): boolean => {
-    const terminal = new Set([UPLOAD_FILE_STATUS.COMPLETED, UPLOAD_FILE_STATUS.ERROR]);
-    const localStatuses = new Set([
+    const terminal = new Set<string>([UPLOAD_FILE_STATUS.COMPLETED, UPLOAD_FILE_STATUS.ERROR]);
+    const localStatuses = new Set<string>([
       UPLOAD_FILE_STATUS.LOCAL_UPLOADING,
       UPLOAD_FILE_STATUS.LOCAL_COMPLETED,
       UPLOAD_FILE_STATUS.DIFY_SYNCING,
