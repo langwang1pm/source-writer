@@ -16,7 +16,7 @@ services:
     restart: unless-stopped
 
     ports:
-      - "80:80"
+      - "${FRONTEND_PORT:-3000}:80"
 
     volumes:
       - uploads:/data/uploads

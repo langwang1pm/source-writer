@@ -1,4 +1,4 @@
-﻿#!/bin/bash
+#!/bin/bash
 # ============================================================
 # source-writer  Production Deployment Script
 # Usage:  ./quick_deploy.sh
@@ -126,14 +126,14 @@ for i in $(seq 1 18); do
     sleep 5
 
     if [ "$FRONTEND_OK" = false ]; then
-        if curl -sf http://localhost/ > /dev/null 2>&1; then
+        if curl -sf http://localhost:3000/ > /dev/null 2>&1; then
             FRONTEND_OK=true
             log_info "  Frontend READY"
         fi
     fi
 
     if [ "$BACKEND_OK" = false ]; then
-        HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost/api/v1/enterprises 2>/dev/null || echo "000")
+        HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/api/v1/enterprises 2>/dev/null || echo "000")
         if [ "$HTTP_CODE" != "000" ] && [ "$HTTP_CODE" != "502" ] && [ "$HTTP_CODE" != "504" ]; then
             BACKEND_OK=true
             log_info "  Backend READY"
@@ -169,8 +169,8 @@ fi
 
 echo ""
 echo "Access URLs:"
-echo "  Frontend: http://localhost"
-echo "  Backend:  http://localhost/api/ (via nginx reverse proxy)"
+echo "  Frontend: http://localhost:3000"
+echo "  Backend:  http://localhost:3000/api/ (via nginx reverse proxy)"
 echo ""
 echo "Useful commands:"
 echo "  Logs:  $COMPOSE_CMD logs -f"
