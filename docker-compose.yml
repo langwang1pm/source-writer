@@ -1,117 +1,131 @@
 
- services:
-   # ============================================
-   # 前置反向代理 + 前端 SPA  —  Nginx
-   # 统一入口，同时提供前端静态文件和 API 路由
-   # 参考 DESIGN_DOC 3.2 的路由规则
-   # ============================================
-   frontend:
-     build:
-       context: ./frontend
-       dockerfile: Dockerfile
-       args:
-         VITE_API_BASE_URL: ${VITE_API_BASE_URL}
+services:
+  # ============================================
+  # 前置反向代理 + 前端 SPA  —  Nginx
+  # 统一入口，同时提供前端静态文件和 API 路由
+  # 参考 DESIGN_DOC 3.2 的路由规则
+  # ============================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL}
 
-     container_name: source-writer-frontend
-     restart: unless-stopped
+    container_name: source-writer-frontend
+    restart: unless-stopped
 
-     ports:
-       - "80:80"
+    ports:
+      - "80:80"
 
-     volumes:
-       - uploads:/data/uploads
+    volumes:
+      - uploads:/data/uploads
 
-     depends_on:
-       - backend
-       - onlyoffice
+    depends_on:
+      - backend
 
-     extra_hosts:
-       - "host.docker.internal:host-gateway"
+      - onlyoffice
+
+
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
 
     networks:
+
       - source-writer-net
+
       - docker_default
 
 
-   # ============================================
-   # 后端服务  —  FastAPI
-   # 不暴露端口到宿主机，由 frontend 的 nginx 反向代理
-   # ============================================
-   backend:
-     build:
-       context: ./backend
-       dockerfile: Dockerfile
 
-     container_name: source-writer-backend
-     restart: unless-stopped
+  # ============================================
+  # 后端服务  —  FastAPI
+  # 不暴露端口到宿主机，由 frontend 的 nginx 反向代理
+  # ============================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
 
-     env_file:
-       - .env
+    container_name: source-writer-backend
+    restart: unless-stopped
 
-     volumes:
-       - uploads:/app/uploads
+    env_file:
+      - .env
 
-     extra_hosts:
-       - "host.docker.internal:host-gateway"
+    volumes:
+      - uploads:/app/uploads
 
-     networks:
-       - source-writer-net
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
-     depends_on: []
+    networks:
+      - source-writer-net
 
-
-   # ============================================
-   # OnlyOffice Document Server
-   # 不暴露端口，仅 internal 网络供 nginx 转发
-   # ============================================
-   onlyoffice:
-     image: onlyoffice/documentserver:latest
-     container_name: source-writer-onlyoffice
-     restart: unless-stopped
-
-     environment:
-       POSTGRES_DB: onlyoffice
-       POSTGRES_USER: onlyoffice
-       POSTGRES_PASSWORD: onlyoffice
-       JWT_SECRET: ${DIFY_OFFICE_SECRET:-}
-
-     volumes:
-       - onlyoffice-data:/var/www/onlyoffice/Data
-       - onlyoffice-logs:/var/log/onlyoffice
-
-     networks:
-       - source-writer-net
+    depends_on: []
 
 
+  # ============================================
+  # OnlyOffice Document Server
+  # 不暴露端口，仅 internal 网络供 nginx 转发
+  # ============================================
+  onlyoffice:
+    image: onlyoffice/documentserver:latest
+    container_name: source-writer-onlyoffice
+    restart: unless-stopped
 
- # ============================================
- # 网络
- # ============================================
+    environment:
+      POSTGRES_DB: onlyoffice
+      POSTGRES_USER: onlyoffice
+      POSTGRES_PASSWORD: onlyoffice
+      JWT_SECRET: ${DIFY_OFFICE_SECRET:-}
+
+    volumes:
+      - onlyoffice-data:/var/www/onlyoffice/Data
+      - onlyoffice-logs:/var/log/onlyoffice
+
+    networks:
+      - source-writer-net
+
+
+
+# ============================================
+# 网络
+# ============================================
 networks:
   source-writer-net:
+
     driver: bridge
+
     ipam:
-      driver: default
+
+    driver: default
+
       config:
+
         - subnet: 172.29.0.0/16
-  
+
+ 
   docker_default:
+
     external: true
 
 
 
- # ============================================
- # 数据卷
- # ============================================
- volumes:
-   # 上传文件持久化 — 绑定宿主机路径
-   uploads:
-     driver: local
-     driver_opts:
-       type: none
-       device: /data/source-writer/uploads
-       o: bind
 
-   # OnlyOffice 持久化数据
-   onlyoffice-data:
-   onlyoffice-logs:
+# ============================================
+# 数据卷
+# ============================================
+volumes:
+  # 上传文件持久化 — 绑定宿主机路径
+  uploads:
+    driver: local
+    driver_opts:
+      type: none
+      device: /data/source-writer/uploads
+      o: bind
+
+  # OnlyOffice 持久化数据
+  onlyoffice-data:
+  onlyoffice-logs:
