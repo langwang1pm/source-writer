@@ -17,10 +17,11 @@ from app.schemas.session import (
     SessionCreate, SessionUpdate, SessionResponse, SessionListResponse,
 )
 
-router = APIRouter(prefix="/api/v1/sessions", tags=["Sessions"])
+router = APIRouter(prefix="/api/v1/sessions", tags=["Sessions"], redirect_slashes=False)
 
 
 @router.post("/", response_model=SessionResponse, status_code=201)
+@router.post("", response_model=SessionResponse, status_code=201)
 async def create_session(body: SessionCreate, db: AsyncSession = Depends(get_db)):
     ws = await db.get(Workspace, body.workspace_id)
     if not ws or ws.deleted_at is not None:
@@ -44,6 +45,7 @@ async def create_session(body: SessionCreate, db: AsyncSession = Depends(get_db)
 
 
 @router.get("/", response_model=SessionListResponse)
+@router.get("", response_model=SessionListResponse)
 async def list_sessions(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
