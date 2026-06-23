@@ -28,8 +28,9 @@
      extra_hosts:
        - "host.docker.internal:host-gateway"
 
-     networks:
-       - source-writer-net
+    networks:
+      - source-writer-net
+      - docker_default
 
 
    # ============================================
@@ -86,13 +87,16 @@
  # ============================================
  # 网络
  # ============================================
- networks:
-   source-writer-net:
-     driver: bridge
-     ipam:
-       driver: default
-       config:
-         - subnet: 172.29.0.0/16
+networks:
+  source-writer-net:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.29.0.0/16
+  
+  docker_default:
+    external: true
 
 
 
