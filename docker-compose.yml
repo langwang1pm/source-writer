@@ -75,6 +75,9 @@ services:
     container_name: source-writer-onlyoffice
     restart: unless-stopped
 
+    ports:
+      - "${ONLYOFFICE_PORT:-8080}:80"
+
     environment:
       POSTGRES_DB: onlyoffice
       POSTGRES_USER: onlyoffice
