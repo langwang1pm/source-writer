@@ -1,4 +1,4 @@
-
+﻿
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -20,7 +20,7 @@ from app.schemas.session import (
 router = APIRouter(prefix="/api/v1/sessions", tags=["Sessions"])
 
 
-@router.post("", response_model=SessionResponse, status_code=201)
+@router.post("/", response_model=SessionResponse, status_code=201)
 async def create_session(body: SessionCreate, db: AsyncSession = Depends(get_db)):
     ws = await db.get(Workspace, body.workspace_id)
     if not ws or ws.deleted_at is not None:
@@ -43,7 +43,7 @@ async def create_session(body: SessionCreate, db: AsyncSession = Depends(get_db)
     return session
 
 
-@router.get("", response_model=SessionListResponse)
+@router.get("/", response_model=SessionListResponse)
 async def list_sessions(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
@@ -127,31 +127,4 @@ async def delete_session(session_id: UUID, db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/{session_id}/stream")
-async def stream_chat(
-    session_id: UUID,
-    user_message_id: UUID,
-    db: AsyncSession = Depends(get_db),
-):
-    from fastapi.responses import StreamingResponse
 
-    session = await db.get(Session, session_id)
-    if not session or session.deleted_at is not None:
-        raise HTTPException(404, detail="Session not found")
-
-    msg = await db.get(ChatMessage, user_message_id)
-    if not msg or msg.deleted_at is not None:
-        raise HTTPException(404, detail="Message not found")
-    if msg.session_id != session_id:
-        raise HTTPException(400, detail="Message not in this session")
-
-    from app.services.stream_svc import create_stream_service
-    svc = create_stream_service(db, session_id, user_message_id)
-    return StreamingResponse(
-        svc.stream(msg.content),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",
-        },
-    )
