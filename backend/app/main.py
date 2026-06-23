@@ -71,7 +71,7 @@ async def lifespan(app: FastAPI):
         _sync_task.cancel()
 
 
-app = FastAPI(title="source-writer", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="source-writer", version="0.1.0", lifespan=lifespan, redirect_slashes=False)
 
 app.add_middleware(
     CORSMiddleware,
