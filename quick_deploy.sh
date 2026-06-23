@@ -1,4 +1,4 @@
-#!/bin/bash
+﻿#!/bin/bash
 # ============================================================
 # source-writer  Production Deployment Script
 # Usage:  ./quick_deploy.sh
@@ -104,7 +104,7 @@ log_info "  Old containers cleaned"
 
 log_info "Step 6/8: Pre-pulling base images..."
 
-docker pull python:3.13-slim       || log_warn "  pull python failed"
+docker pull python:3.12-slim       || log_warn "  pull python failed"
 docker pull node:22-alpine         || log_warn "  pull node failed"
 docker pull nginx:alpine           || log_warn "  pull nginx failed"
 docker pull onlyoffice/documentserver:latest || log_warn "  pull onlyoffice failed"
