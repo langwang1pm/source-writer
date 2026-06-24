@@ -78,14 +78,14 @@ export default function DocumentPage() {
         </a>
       </div>
 
-      {/* Content */}
+     {/* Content */}
       <div style={{ flex: 1, overflow: "auto", padding: 24, background: "#f5f5f7" }}>
         <div style={{ maxWidth: 800, margin: "0 auto", background: "#fff", borderRadius: 12, padding: 32, boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
           {editing ? (
             <textarea
               value={markdown}
               onChange={(e) => setMarkdown(e.target.value)}
-              style={{ width: "100%", minHeight: 500, padding: 16, borderRadius: 8, border: "1px solid #ddd", fontSize: 14, lineHeight: 1.7, fontFamily: "monospace", resize: "vertical", outline: "none" }}
+              style={{ width: "100%", minHeight: "80vh", padding: 16, borderRadius: 8, border: "1px solid #ddd", fontSize: 14, lineHeight: 1.7, fontFamily: "monospace", resize: "vertical", outline: "none" }}
             />
           ) : (
             <div className="markdown-body">

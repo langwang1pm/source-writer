@@ -1,4 +1,4 @@
-import { BookOpen, Quote, ChevronRight, ChevronLeft, Loader2, ChevronDown, ChevronUp } from "lucide-react";
+import { BookOpen, Quote, Loader2, ChevronDown, ChevronUp } from "lucide-react";
 import { useEffect, useRef, useState, useCallback } from "react";
 import type { SourceRef, SegmentDetail } from "../../types";
 import ReactMarkdown from "react-markdown";
@@ -8,11 +8,10 @@ import { difySegments } from "../../api/client";
 interface CitationPanelProps {
   citations: SourceRef[];
   isOpen: boolean;
-  onToggle: () => void;
   activeIndex?: number | null;
 }
 
-export default function CitationPanel({ citations, isOpen, onToggle, activeIndex }: CitationPanelProps) {
+export default function CitationPanel({ citations, isOpen, activeIndex }: CitationPanelProps) {
   const listRef = useRef<HTMLDivElement>(null);
   const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
   const [loadingIdx, setLoadingIdx] = useState<number | null>(null);
@@ -79,33 +78,6 @@ export default function CitationPanel({ citations, isOpen, onToggle, activeIndex
 
   return (
     <>
-      {/* Toggle button - always visible on the edge */}
-      <button
-        onClick={onToggle}
-        title={isOpen ? "收起引用面板" : "展开引用面板"}
-        style={{
-          position: "absolute",
-          top: 0,
-          right: isOpen ? 300 : 0,
-          width: 24,
-          height: 48,
-          border: "1px solid #e0e0e0",
-          borderRight: isOpen ? "none" : "1px solid #e0e0e0",
-          background: "#fff",
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          borderRadius: "6px 0 0 6px",
-          zIndex: 10,
-          color: "#888",
-          transition: "right 0.2s",
-          boxShadow: "-1px 1px 4px rgba(0,0,0,0.06)",
-        }}
-      >
-        {isOpen ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
-      </button>
-
       {/* Panel */}
       <div
         style={{

@@ -358,7 +358,6 @@ export default function ChatPage() {
               <CitationPanel
                 citations={citationRefs}
                 isOpen={showCitation}
-                onToggle={() => setShowCitation(!showCitation)}
                 activeIndex={activeCitationIndex}
               />
             </div>
