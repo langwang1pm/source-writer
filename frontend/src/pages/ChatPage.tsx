@@ -33,6 +33,8 @@ export default function ChatPage() {
   const [sessionTaskType, setSessionTaskType] = useState<string>("");
 
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const thinkBufRef = useRef("");
+  const insideThinkRef = useRef(false);
 
   // Load messages for active session
   useEffect(() => {
@@ -114,70 +116,138 @@ export default function ChatPage() {
     setStreamBlocks([]);
     setStreamingCard(null);
     setStreamPhase("waiting");
+    setStreamingCard(1);
 
     // Start SSE stream
     const streamUrl = messagesApi.streamUrl(sid, msgRes.id);
     startStream(streamUrl, {
       onThinkDelta: (cardOrdinal, delta) => {
-        // Strip <think> tag and leading whitespace from the delta
-        const thinkDelta = delta.replace(/^<think>\s*/g, "");
-        setStreamPhase((prev) => prev === "waiting" ? "thinking" : prev);
-        setStreamBlocks((prev) => {
-          const existing = prev.find(
-            (b) => b.card_ordinal === cardOrdinal && b.block_type === "think"
-          );
-          if (existing) {
-            if (!thinkDelta) return prev;
-            return prev.map((b) =>
-              b.card_ordinal === cardOrdinal && b.block_type === "think"
-                ? { ...b, content: b.content + thinkDelta }
-                : b
-            );
-          }
-          return [
-            ...prev,
-            {
-              id: `stream-${cardOrdinal}-think`,
-              session_id: sid,
-              user_message_id: msgRes.id,
-              card_ordinal: cardOrdinal,
-              block_type: "think",
-              content: thinkDelta,
-              ordinal: prev.length + 1,
-              created_at: new Date().toISOString(),
-            },
-          ];
-        });
+        // Think content is handled by onAnswerDelta via <think> tag parsing
+        // Only set streaming state here
+        if (delta.replace(/^<think>\s*/g, "").trim()) {
+          setStreamPhase((prev) => prev === "waiting" ? "thinking" : prev);
+        }
         setStreamingCard(cardOrdinal);
       },
       onAnswerDelta: (cardOrdinal, delta) => {
-        // Strip </think> tag and leading whitespace from the delta
-        const answerDelta = delta.replace(/^<\/think>\s*/g, "");
-        setStreamPhase((prev) => prev === "thinking" || prev === "waiting" ? "answering" : prev);
-        setStreamBlocks((prev) => {
-          const existing = prev.find(
-            (b) => b.card_ordinal === cardOrdinal && b.block_type === "answer"
-          );
-          if (existing) {
-            return prev.map((b) =>
-              b.card_ordinal === cardOrdinal && b.block_type === "answer"
-                ? { ...b, content: b.content + answerDelta }
-                : b
-            );
+        // Buffer and split think/answer content by <think> tags
+        thinkBufRef.current += delta;
+        const buf = thinkBufRef.current;
+
+        let thinkChunk = "";
+        let answerChunk = "";
+
+        // Process the buffer
+        let remaining = buf;
+        thinkBufRef.current = "";
+
+        while (remaining.length > 0) {
+          const thinkStart = remaining.indexOf("<think>");
+          const thinkEnd = remaining.indexOf("</think>");
+
+          if (thinkStart === -1 && thinkEnd === -1) {
+            // No tags in remaining text
+            if (insideThinkRef.current) {
+              thinkChunk += remaining;
+            } else {
+              answerChunk += remaining;
+            }
+            remaining = "";
+          } else if (thinkStart >= 0 && (thinkEnd === -1 || thinkStart < thinkEnd)) {
+            // <think> comes first (or only <think> exists)
+            if (insideThinkRef.current) {
+              // Already inside think - text before <think> is think content
+              thinkChunk += remaining.substring(0, thinkStart);
+            } else {
+              // Entering think - text before <think> is answer
+              answerChunk += remaining.substring(0, thinkStart);
+              insideThinkRef.current = true;
+            }
+            remaining = remaining.substring(thinkStart + 7); // skip <think>
+
+            // Check if </think> is in the remaining text
+            const closeIdx = remaining.indexOf("</think>");
+            if (closeIdx >= 0) {
+              thinkChunk += remaining.substring(0, closeIdx);
+              remaining = remaining.substring(closeIdx + 8); // skip </think>
+              insideThinkRef.current = false;
+            } else {
+              // No closing tag yet - emit immediately
+              thinkChunk += remaining;
+              remaining = "";
+            }
+          } else if (thinkEnd >= 0) {
+            // </think> without preceding <think>
+            if (insideThinkRef.current) {
+              thinkChunk += remaining.substring(0, thinkEnd);
+              remaining = remaining.substring(thinkEnd + 8);
+              insideThinkRef.current = false;
+            } else {
+              answerChunk += remaining.substring(0, thinkEnd + 8);
+              remaining = remaining.substring(thinkEnd + 8);
+            }
           }
-          return [
-            ...prev,
-            {
-              id: `stream-${cardOrdinal}-answer`,
-              session_id: sid,
-              user_message_id: msgRes.id,
-              card_ordinal: cardOrdinal,
-              block_type: "answer",
-              content: answerDelta,
-              ordinal: prev.length + 1,
-              created_at: new Date().toISOString(),
-            },
-          ];
+        }
+
+        // Update stream phase
+        if (thinkChunk) {
+          setStreamPhase((prev) => prev === "waiting" || prev === "idle" ? "thinking" : prev);
+        }
+        if (answerChunk) {
+          setStreamPhase((prev) => prev === "thinking" || prev === "waiting" ? "answering" : prev);
+        }
+
+        // Update stream blocks
+        setStreamBlocks((prev) => {
+          const newBlocks = [...prev];
+
+          if (thinkChunk) {
+            const thinkIdx = newBlocks.findIndex(
+              (b) => b.card_ordinal === cardOrdinal && b.block_type === "think"
+            );
+            if (thinkIdx >= 0) {
+              newBlocks[thinkIdx] = {
+                ...newBlocks[thinkIdx],
+                content: newBlocks[thinkIdx].content + thinkChunk,
+              };
+            } else {
+              newBlocks.push({
+                id: `stream-${cardOrdinal}-think`,
+                session_id: sid,
+                user_message_id: msgRes.id,
+                card_ordinal: cardOrdinal,
+                block_type: "think",
+                content: thinkChunk,
+                ordinal: newBlocks.length + 1,
+                created_at: new Date().toISOString(),
+              });
+            }
+          }
+
+          if (answerChunk) {
+            const answerIdx = newBlocks.findIndex(
+              (b) => b.card_ordinal === cardOrdinal && b.block_type === "answer"
+            );
+            if (answerIdx >= 0) {
+              newBlocks[answerIdx] = {
+                ...newBlocks[answerIdx],
+                content: newBlocks[answerIdx].content + answerChunk,
+              };
+            } else {
+              newBlocks.push({
+                id: `stream-${cardOrdinal}-answer`,
+                session_id: sid,
+                user_message_id: msgRes.id,
+                card_ordinal: cardOrdinal,
+                block_type: "answer",
+                content: answerChunk,
+                ordinal: newBlocks.length + 1,
+                created_at: new Date().toISOString(),
+              });
+            }
+          }
+
+          return newBlocks;
         });
         setStreamingCard(cardOrdinal);
       },
@@ -279,14 +349,9 @@ export default function ChatPage() {
               {messages.map((msg) => (
                 <MessageCard key={msg.id} role={msg.role} content={msg.content} blocks={msg.blocks} responseDoc={msg.responseDoc} onCitationClick={handleCitationClick} workspaceId={workspaceId} citationRefs={citationRefs} />
               ))}
-              {streamBlocks.length > 0 && (
+              {isStreaming ? (
                 <MessageCard role="assistant" blocks={streamBlocks} streamingCard={streamingCard} streamPhase={streamPhase} onCitationClick={handleCitationClick} workspaceId={workspaceId} citationRefs={citationRefs} />
-              )}
-              {isStreaming && streamBlocks.length === 0 && (
-                <div style={{ padding: "16px 20px 16px 72px", fontSize: 13, color: "#888" }}>
-                  AI 正在生成...
-                </div>
-              )}
+              ) : null}
               <div ref={chatEndRef} />
             </div>
               {/* Citation panel */}
