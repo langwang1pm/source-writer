@@ -25,6 +25,7 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [streamBlocks, setStreamBlocks] = useState<MessageBlock[]>([]);
   const [streamingCard, setStreamingCard] = useState<number | null>(null);
+  const [streamPhase, setStreamPhase] = useState<"idle" | "waiting" | "thinking" | "answering">("idle");
   const [citationRefs, setCitationRefs] = useState<SourceRef[]>([]);
   const [showCitation, setShowCitation] = useState(true);
   const [activeCitationIndex, setActiveCitationIndex] = useState<number | null>(null);
@@ -39,6 +40,7 @@ export default function ChatPage() {
     // Clear temporary states when switching sessions
     setStreamBlocks([]);
     setStreamingCard(null);
+    setStreamPhase("idle");
     setCitationRefs([]);
     loadMessages(sessionId);
     sessions.get(sessionId).then((s: any) => {
@@ -111,19 +113,24 @@ export default function ChatPage() {
     setMessages((prev) => [...prev, userMsg]);
     setStreamBlocks([]);
     setStreamingCard(null);
+    setStreamPhase("waiting");
 
     // Start SSE stream
     const streamUrl = messagesApi.streamUrl(sid, msgRes.id);
     startStream(streamUrl, {
       onThinkDelta: (cardOrdinal, delta) => {
+        // Strip <think> tag and leading whitespace from the delta
+        const thinkDelta = delta.replace(/^<think>\s*/g, "");
+        setStreamPhase((prev) => prev === "waiting" ? "thinking" : prev);
         setStreamBlocks((prev) => {
           const existing = prev.find(
             (b) => b.card_ordinal === cardOrdinal && b.block_type === "think"
           );
           if (existing) {
+            if (!thinkDelta) return prev;
             return prev.map((b) =>
               b.card_ordinal === cardOrdinal && b.block_type === "think"
-                ? { ...b, content: b.content + delta }
+                ? { ...b, content: b.content + thinkDelta }
                 : b
             );
           }
@@ -135,7 +142,7 @@ export default function ChatPage() {
               user_message_id: msgRes.id,
               card_ordinal: cardOrdinal,
               block_type: "think",
-              content: delta,
+              content: thinkDelta,
               ordinal: prev.length + 1,
               created_at: new Date().toISOString(),
             },
@@ -144,6 +151,9 @@ export default function ChatPage() {
         setStreamingCard(cardOrdinal);
       },
       onAnswerDelta: (cardOrdinal, delta) => {
+        // Strip </think> tag and leading whitespace from the delta
+        const answerDelta = delta.replace(/^<\/think>\s*/g, "");
+        setStreamPhase((prev) => prev === "thinking" || prev === "waiting" ? "answering" : prev);
         setStreamBlocks((prev) => {
           const existing = prev.find(
             (b) => b.card_ordinal === cardOrdinal && b.block_type === "answer"
@@ -151,7 +161,7 @@ export default function ChatPage() {
           if (existing) {
             return prev.map((b) =>
               b.card_ordinal === cardOrdinal && b.block_type === "answer"
-                ? { ...b, content: b.content + delta }
+                ? { ...b, content: b.content + answerDelta }
                 : b
             );
           }
@@ -163,7 +173,7 @@ export default function ChatPage() {
               user_message_id: msgRes.id,
               card_ordinal: cardOrdinal,
               block_type: "answer",
-              content: delta,
+              content: answerDelta,
               ordinal: prev.length + 1,
               created_at: new Date().toISOString(),
             },
@@ -192,6 +202,7 @@ export default function ChatPage() {
       },
       onDone: () => {
         setStreamingCard(null);
+        setStreamPhase("idle");
         setStreamBlocks([]);
         setCitationRefs([]);
         if (sessionId) loadMessages(sessionId);
@@ -199,6 +210,7 @@ export default function ChatPage() {
       onError: (err) => {
         console.error("SSE error:", err);
         setStreamingCard(null);
+        setStreamPhase("idle");
       },
     });
   }, [workspaceId, sessionId, isStreaming, startStream]);
@@ -266,9 +278,9 @@ export default function ChatPage() {
                 <MessageCard key={msg.id} role={msg.role} content={msg.content} blocks={msg.blocks} responseDoc={msg.responseDoc} onCitationClick={handleCitationClick} workspaceId={workspaceId} />
               ))}
               {streamBlocks.length > 0 && (
-                <MessageCard role="assistant" blocks={streamBlocks} streamingCard={streamingCard} onCitationClick={handleCitationClick} workspaceId={workspaceId} />
+                <MessageCard role="assistant" blocks={streamBlocks} streamingCard={streamingCard} streamPhase={streamPhase} onCitationClick={handleCitationClick} workspaceId={workspaceId} />
               )}
-              {isStreaming && (
+              {isStreaming && streamBlocks.length === 0 && (
                 <div style={{ padding: "16px 20px 16px 72px", fontSize: 13, color: "#888" }}>
                   AI 正在生成...
                 </div>

@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { Bot, User, ChevronDown, ChevronUp, Sparkles, Download, FileText, ExternalLink } from "lucide-react";
 import { responseDocs } from "../../api/client";
 import type { MessageBlock, ResponseDoc } from "../../types";
@@ -11,12 +11,13 @@ interface Props {
   content?: string;
   blocks?: MessageBlock[];
   streamingCard?: number | null;
+  streamPhase?: "idle" | "waiting" | "thinking" | "answering";
   responseDoc?: ResponseDoc | null;
   onCitationClick?: (sourceName: string) => void;
   workspaceId?: string;
 }
 
-export default function MessageCard({ role, content, blocks, streamingCard, responseDoc, onCitationClick, workspaceId }: Props) {
+export default function MessageCard({ role, content, blocks, streamingCard, streamPhase, responseDoc, onCitationClick, workspaceId }: Props) {
   if (role === "user") {
     return (
       <div style={{ display: "flex", gap: 10, padding: "16px 20px", justifyContent: "flex-end" }}>
@@ -39,17 +40,22 @@ export default function MessageCard({ role, content, blocks, streamingCard, resp
     );
   }
 
-  if (!blocks || blocks.length === 0) return null;
+  if ((!blocks || blocks.length === 0) && !streamPhase) return null;
 
   // Group blocks by card_ordinal
   const cards = new Map<number, { think: string; answer: string }>();
-  for (const b of blocks) {
+  for (const b of blocks || []) {
     if (!cards.has(b.card_ordinal)) {
       cards.set(b.card_ordinal, { think: "", answer: "" });
     }
     const card = cards.get(b.card_ordinal)!;
     if (b.block_type === "think") card.think += b.content;
     else card.answer += b.content;
+  }
+
+  // During streaming, ensure at least one card entry for stable layout
+  if (streamPhase && streamPhase !== "idle" && cards.size === 0) {
+    cards.set(streamingCard ?? 0, { think: "", answer: "" });
   }
 
   const cardKeys = Array.from(cards.keys());
@@ -65,6 +71,7 @@ export default function MessageCard({ role, content, blocks, streamingCard, resp
             key={cardOrdinal}
             card={cards.get(cardOrdinal)!}
             isStreaming={streamingCard === cardOrdinal}
+            streamPhase={streamPhase}
             isLastCard={cardOrdinal === cardKeys[cardKeys.length - 1]}
             responseDoc={responseDoc}
             onCitationClick={onCitationClick}
@@ -76,9 +83,10 @@ export default function MessageCard({ role, content, blocks, streamingCard, resp
   );
 }
 
-function CardItem({ card, isStreaming, isLastCard, responseDoc, onCitationClick, workspaceId }: {
+function CardItem({ card, isStreaming, streamPhase, isLastCard, responseDoc, onCitationClick, workspaceId }: {
   card: { think: string; answer: string };
   isStreaming: boolean;
+  streamPhase?: "idle" | "waiting" | "thinking" | "answering";
   isLastCard: boolean;
   responseDoc?: ResponseDoc | null;
   onCitationClick?: (sourceName: string) => void;
@@ -87,7 +95,15 @@ function CardItem({ card, isStreaming, isLastCard, responseDoc, onCitationClick,
   const [thinkingCollapsed, setThinkingCollapsed] = useState(true);
   const hasThink = card.think.length > 0;
   const hasAnswer = card.answer.length > 0;
-  const hasAnyContent = hasThink || hasAnswer;
+  // Auto-expand/collapse thinking section based on stream phase
+  useEffect(() => {
+    if (!isStreaming) return;
+    if (streamPhase === "thinking") {
+      setThinkingCollapsed(false);
+    } else if (streamPhase === "answering") {
+      setThinkingCollapsed(true);
+    }
+  }, [streamPhase, isStreaming]);
 
   // Pre-process answer content to make citation markers clickable
   const processedAnswer = useMemo(() => {
@@ -119,25 +135,11 @@ function CardItem({ card, isStreaming, isLastCard, responseDoc, onCitationClick,
       border: "1px solid #e0e0e0",
       borderRadius: 12,
       overflow: "hidden",
-      transition: "opacity 0.2s",
-      opacity: isStreaming && !hasAnyContent ? 0.85 : 1,
     }}>
-      {/* Streaming animation (no content yet) */}
-      {isStreaming && !hasAnyContent && (
-        <div style={{ padding: "24px 20px", display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ display: "flex", gap: 4 }}>
-            <div className="sw-dot" style={{ width: 8, height: 8, borderRadius: "50%", background: "#d97706", animation: "sw-bounce 1.2s infinite", animationDelay: "0ms" }} />
-            <div className="sw-dot" style={{ width: 8, height: 8, borderRadius: "50%", background: "#d97706", animation: "sw-bounce 1.2s infinite", animationDelay: "200ms" }} />
-            <div className="sw-dot" style={{ width: 8, height: 8, borderRadius: "50%", background: "#d97706", animation: "sw-bounce 1.2s infinite", animationDelay: "400ms" }} />
-          </div>
-          <span style={{ fontSize: 13, color: "#a16207", fontWeight: 500 }}>AI 正在思考</span>
-        </div>
-      )}
-
       {/* Thinking section */}
-      {hasThink && (
+      {(isStreaming || hasThink) && (
         <div style={{
-          borderBottom: hasAnswer ? "1px solid #fde68a" : "none",
+          borderBottom: hasAnswer || (isStreaming && streamPhase === "answering") ? "1px solid #fde68a" : "none",
           background: "#fffbeb",
         }}>
           <button
@@ -177,20 +179,34 @@ function CardItem({ card, isStreaming, isLastCard, responseDoc, onCitationClick,
               fontSize: 13, lineHeight: 1.6, color: "#555",
               borderTop: "1px solid #fde68a",
             }}>
-              <div className="markdown-body" style={{ fontSize: 13, color: "#555" }}>
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>{card.think}</ReactMarkdown>
-              </div>
+              {hasThink ? (
+                <div className="markdown-body" style={{ fontSize: 13, color: "#555" }}>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{card.think}</ReactMarkdown>
+                </div>
+              ) : (
+                <div style={{ color: "#b45309", fontStyle: "italic", fontSize: 13 }}>
+                  思考中...
+                </div>
+              )}
             </div>
           )}
         </div>
       )}
 
       {/* Answer section */}
-      {hasAnswer && (
+      {(hasAnswer || (isStreaming && streamPhase === "answering")) && (
         <div style={{ padding: "14px 16px", background: "#fff" }}>
-          <div className="markdown-body" style={{ fontSize: 14, lineHeight: 1.7, color: "#222" }}>
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{card.answer}</ReactMarkdown>
-          </div>
+          {hasAnswer ? (
+            <div className="markdown-body" style={{ fontSize: 14, lineHeight: 1.7, color: "#222" }}>
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{card.answer}</ReactMarkdown>
+            </div>
+          ) : (
+            <div style={{ display: "flex", gap: 3, alignItems: "center", minHeight: 20 }}>
+              <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#6c5ce7", animation: "sw-bounce 1.2s infinite", animationDelay: "0ms" }} />
+              <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#6c5ce7", animation: "sw-bounce 1.2s infinite", animationDelay: "200ms" }} />
+              <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#6c5ce7", animation: "sw-bounce 1.2s infinite", animationDelay: "400ms" }} />
+            </div>
+          )}
         </div>
       )}
 

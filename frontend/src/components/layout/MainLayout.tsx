@@ -194,12 +194,11 @@ export default function MainLayout() {
             width: 360, maxWidth: "90vw", boxShadow: "0 8px 30px rgba(0,0,0,0.15)",
           }} onClick={(e) => e.stopPropagation()}>
             <div style={{display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16}}>
-              <span style={{fontWeight: 600, fontSize: 15}}>New Chat</span>
+              <span style={{fontWeight: 600, fontSize: 15}}>选择新对话的任务类型：</span>
               <button onClick={() => setShowNewDialog(false)} style={{background: "none", border: "none", cursor: "pointer", color: "#999", padding: 4}}>
                 <X size={16} />
               </button>
             </div>
-            <div style={{fontSize: 13, color: "#666", marginBottom: 10}}>Select task type</div>
             {availTaskTypes.length === 0 && (
               <div style={{padding: "20px 0", textAlign: "center", fontSize: 13, color: "#999"}}>
                 No available task types
@@ -222,7 +221,7 @@ export default function MainLayout() {
               color: "#fff", cursor: selectedTaskType ? "pointer" : "default",
               fontSize: 14, fontWeight: 500,
             }}>
-              Create
+              创建
             </button>
           </div>
         </div>
