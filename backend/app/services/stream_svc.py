@@ -13,7 +13,7 @@ from app.models.chat_message import ChatMessage
 from app.models.message_block import MessageBlock
 from app.models.response_doc import ResponseDoc
 from app.models.source_ref import SourceRef
-from app.utils.citation_parser import parse_citations, clean_markdown
+from app.utils.citation_parser import parse_citations, clean_markdown, extract_title_from_content
 
 
 class CardState:
@@ -368,6 +368,20 @@ class StreamService:
             for sr in self.all_source_refs:
                 sr.response_doc_id = doc.id
 
+        # Fetch Dify segment titles and update source_ref.source_name
+        from app.clients.dify_dataset_client import dify_dataset_client
+        for sr in self.all_source_refs:
+            if sr.dify_document_id and sr.chunk_id:
+                try:
+                    detail = await dify_dataset_client.get_segment_detail(
+                        sr.dify_document_id, sr.chunk_id
+                    )
+                    if detail:
+                        title = extract_title_from_content(detail.get("content"))
+                        if title:
+                            sr.source_name = title
+                except Exception:
+                    pass  # Keep existing source_name on failure
         await self.db.commit()
         await self.db.refresh(doc)
 

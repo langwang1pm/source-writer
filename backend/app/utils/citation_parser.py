@@ -62,3 +62,25 @@ def clean_markdown(text: str) -> str:
 def truncate_title(text: str, max_len: int = 30) -> str:
     text = text.strip().replace("\n", " ")
     return text[:max_len] + ("..." if len(text) > max_len else "")
+
+
+HEADING_RE = re.compile(r"^(#{1,6})\s+(.+?)(?:\s+#*)?$", re.MULTILINE)
+
+
+def extract_title_from_content(content: str | None) -> str:
+    """Extract a readable title from Dify segment markdown content.
+
+    Looks for the first Markdown heading (any level # to ######) and returns its text.
+    Falls back to the first non-empty line, truncated to 80 chars.
+    Returns empty string if content is empty.
+    """
+    if not content:
+        return ""
+    match = HEADING_RE.search(content)
+    if match:
+        return match.group(2).strip()
+    for line in content.split("\n"):
+        line = line.strip()
+        if line:
+            return line[:80] + ("..." if len(line) > 80 else "")
+    return ""

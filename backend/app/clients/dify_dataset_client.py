@@ -145,10 +145,11 @@ class DifyDatasetClient:
             return data.get("indexing_status", "unknown")
 
 
+    async def get_segment_detail(self, document_id: str, chunk_id: str) -> dict | None:
         """Fetch a specific segment (chunk) detail from Dify knowledge base.
 
         Uses the Dify API: GET /v1/datasets/{dataset_id}/documents/{document_id}/segments/{segment_id}
-        Returns the segment data dict, or None on failure.
+        Returns the segment data dict containing content, keywords, etc., or None on failure.
         """
         if not self.BASE_URL or not self.DATASET_ID:
             return None

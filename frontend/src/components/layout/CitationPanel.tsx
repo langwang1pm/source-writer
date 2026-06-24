@@ -1,6 +1,8 @@
 import { BookOpen, Quote, ChevronRight, ChevronLeft, Loader2, ChevronDown, ChevronUp } from "lucide-react";
 import { useEffect, useRef, useState, useCallback } from "react";
 import type { SourceRef, SegmentDetail } from "../../types";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { difySegments } from "../../api/client";
 
 interface CitationPanelProps {
@@ -270,8 +272,10 @@ export default function CitationPanel({ citations, isOpen, onToggle, activeIndex
                         <div>加载中...</div>
                       </div>
                     ) : segmentDetails.has(i) ? (
-                      <div>
-                        {segmentDetails.get(i)?.content || "暂无内容"}
+                      <div className="markdown-body" style={{ fontSize: 12, lineHeight: 1.6, color: "#444" }}>
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                          {segmentDetails.get(i)?.content || ""}
+                        </ReactMarkdown>
                       </div>
                     ) : (
                       <div style={{ color: "#999", fontStyle: "italic" }}>
