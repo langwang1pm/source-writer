@@ -201,6 +201,8 @@ class StreamService:
                                 ordinal=ref["ordinal"],
                                 source_name=ref["source_name"],
                                 char_position=ref["char_position"],
+                                dify_document_id=ref.get("dify_document_id"),
+                                chunk_id=ref.get("chunk_id"),
                             )
                             self.db.add(sr)
                             self.all_source_refs.append(sr)
@@ -250,6 +252,8 @@ class StreamService:
                                 ordinal=ref["ordinal"],
                                 source_name=ref["source_name"],
                                 char_position=ref["char_position"],
+                                dify_document_id=ref.get("dify_document_id"),
+                                chunk_id=ref.get("chunk_id"),
                             )
                             self.db.add(sr)
                             self.all_source_refs.append(sr)
@@ -313,6 +317,8 @@ class StreamService:
                     ordinal=ref["ordinal"],
                     source_name=ref["source_name"],
                     char_position=ref["char_position"],
+                    dify_document_id=ref.get("dify_document_id"),
+                    chunk_id=ref.get("chunk_id"),
                 )
                 self.db.add(sr)
                 self.all_source_refs.append(sr)
@@ -320,6 +326,8 @@ class StreamService:
                     "ordinal": ref["ordinal"],
                     "source_name": ref["source_name"],
                     "char_position": ref["char_position"],
+                    "dify_document_id": ref.get("dify_document_id"),
+                    "chunk_id": ref.get("chunk_id"),
                 })
 
             if refs_data:

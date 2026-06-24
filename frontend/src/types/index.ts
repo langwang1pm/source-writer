@@ -82,6 +82,22 @@ export interface SourceRef {
   char_position: number | null;
 }
 
+// Dify segment detail returned from API proxy
+export interface SegmentDetail {
+  id: string;
+  document_id: string;
+  content: string;
+  word_count: number;
+  tokens: number;
+  keywords: string[];
+  index_node_id: string;
+  index_node_hash: string;
+  status: string;
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface UploadedFile {
   id: string;
   client_enterprise_id: string;
@@ -122,10 +138,18 @@ export interface PaginatedResponse<T> {
 
 // === SSE Event types ===
 
+export interface CitationRefData {
+  ordinal: number;
+  source_name: string;
+  char_position: number;
+  dify_document_id?: string;
+  chunk_id?: string;
+}
+
 export type SSEEvent =
   | { event: "think_delta"; data: { card_ordinal: number; delta: string } }
   | { event: "answer_delta"; data: { card_ordinal: number; delta: string } }
-  | { event: "citation_update"; data: { card_ordinal: number; refs: { ordinal: number; source_name: number; char_position: number }[] } }
+  | { event: "citation_update"; data: { card_ordinal: number; refs: CitationRefData[] } }
   | { event: "done"; data: { status: string } }
   | { event: "error"; data: { message: string } }
   | { event: "ping"; data: {} }

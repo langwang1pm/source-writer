@@ -145,4 +145,22 @@ class DifyDatasetClient:
             return data.get("indexing_status", "unknown")
 
 
+        """Fetch a specific segment (chunk) detail from Dify knowledge base.
+
+        Uses the Dify API: GET /v1/datasets/{dataset_id}/documents/{document_id}/segments/{segment_id}
+        Returns the segment data dict, or None on failure.
+        """
+        if not self.BASE_URL or not self.DATASET_ID:
+            return None
+        url = f"{self.BASE_URL}/v1/datasets/{self.DATASET_ID}/documents/{document_id}/segments/{chunk_id}"
+        headers = {"Authorization": f"Bearer {self.API_KEY}"}
+        timeout = httpx.Timeout(30.0)
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            resp = await client.get(url, headers=headers)
+            if resp.status_code != 200:
+                return None
+            data = resp.json()
+            return data.get("data") or data
+
+
 dify_dataset_client = DifyDatasetClient()

@@ -117,6 +117,11 @@ export const sourceRefs = {
 };
 
 // === Uploaded Files ===
+export const difySegments = {
+  get: (documentId: string, chunkId: string) =>
+    request<any>(`/dify/segments/${documentId}/${chunkId}`),
+};
+
 export const uploadedFiles = {
   list: (params?: { page?: number; enterprise_id?: string; search?: string }) => {
     const q = new URLSearchParams();

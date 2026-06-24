@@ -191,9 +191,9 @@ export default function ChatPage() {
             card_ordinal: cardOrdinal,
             ordinal: r.ordinal,
             source_name: r.source_name,
-            dify_document_id: null,
+            dify_document_id: r.dify_document_id || null,
             uploaded_file_id: null,
-            chunk_id: null,
+            chunk_id: r.chunk_id || null,
             snippet: null,
             relevance_score: null,
             char_position: r.char_position,
@@ -215,12 +215,14 @@ export default function ChatPage() {
     });
   }, [workspaceId, sessionId, isStreaming, startStream]);
 
-  const handleCitationClick = useCallback((sourceName: string) => {
-    const idx = citationRefs.findIndex((r) => r.source_name === sourceName || r.source_name.includes(sourceName));
+  const handleCitationClick = useCallback((ordinal: number, cardOrdinal: number) => {
+    // Find ref matching ordinal + card_ordinal
+    const idx = citationRefs.findIndex((r) => r.ordinal === ordinal && r.card_ordinal === cardOrdinal);
     if (idx >= 0) {
       setActiveCitationIndex(idx);
+      if (!showCitation) setShowCitation(true);
     }
-  }, [citationRefs]);
+  }, [citationRefs, showCitation]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -275,10 +277,10 @@ export default function ChatPage() {
             <div style={{ display: "flex", flex: 1, overflow: "hidden", position: "relative" }}>
               <div style={{ flex: 1, overflow: "auto", background: "#f5f5f7" }}>
               {messages.map((msg) => (
-                <MessageCard key={msg.id} role={msg.role} content={msg.content} blocks={msg.blocks} responseDoc={msg.responseDoc} onCitationClick={handleCitationClick} workspaceId={workspaceId} />
+                <MessageCard key={msg.id} role={msg.role} content={msg.content} blocks={msg.blocks} responseDoc={msg.responseDoc} onCitationClick={handleCitationClick} workspaceId={workspaceId} citationRefs={citationRefs} />
               ))}
               {streamBlocks.length > 0 && (
-                <MessageCard role="assistant" blocks={streamBlocks} streamingCard={streamingCard} streamPhase={streamPhase} onCitationClick={handleCitationClick} workspaceId={workspaceId} />
+                <MessageCard role="assistant" blocks={streamBlocks} streamingCard={streamingCard} streamPhase={streamPhase} onCitationClick={handleCitationClick} workspaceId={workspaceId} citationRefs={citationRefs} />
               )}
               {isStreaming && streamBlocks.length === 0 && (
                 <div style={{ padding: "16px 20px 16px 72px", fontSize: 13, color: "#888" }}>

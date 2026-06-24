@@ -1,6 +1,7 @@
-import { BookOpen, Quote, ChevronRight, ChevronLeft } from "lucide-react";
-import { useEffect, useRef } from "react";
-import type { SourceRef } from "../../types";
+import { BookOpen, Quote, ChevronRight, ChevronLeft, Loader2, ChevronDown, ChevronUp } from "lucide-react";
+import { useEffect, useRef, useState, useCallback } from "react";
+import type { SourceRef, SegmentDetail } from "../../types";
+import { difySegments } from "../../api/client";
 
 interface CitationPanelProps {
   citations: SourceRef[];
@@ -11,16 +12,68 @@ interface CitationPanelProps {
 
 export default function CitationPanel({ citations, isOpen, onToggle, activeIndex }: CitationPanelProps) {
   const listRef = useRef<HTMLDivElement>(null);
+  const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
+  const [loadingIdx, setLoadingIdx] = useState<number | null>(null);
+  const [segmentDetails, setSegmentDetails] = useState<Map<number, SegmentDetail>>(new Map());
 
-  // Scroll to active citation when activeIndex changes
+  // Scroll to active citation when activeIndex changes, and auto-expand
   useEffect(() => {
-    if (activeIndex != null && listRef.current) {
+    if (activeIndex == null) return;
+
+    // Scroll to the citation card
+    if (listRef.current) {
       const el = listRef.current.querySelector('[data-citation-idx="' + activeIndex + '"]');
       if (el) {
         el.scrollIntoView({ behavior: "smooth", block: "center" });
       }
     }
-  }, [activeIndex]);
+
+    // Auto-expand and fetch segment detail
+    if (activeIndex < citations.length) {
+      setExpandedIdx(activeIndex);
+      const ref = citations[activeIndex];
+      if (ref.dify_document_id && ref.chunk_id && !segmentDetails.has(activeIndex)) {
+        setLoadingIdx(activeIndex);
+        difySegments.get(ref.dify_document_id, ref.chunk_id)
+          .then((detail: any) => {
+            setSegmentDetails((prev) => {
+              const next = new Map(prev);
+              next.set(activeIndex, detail as SegmentDetail);
+              return next;
+            });
+          })
+          .finally(() => setLoadingIdx(null));
+      }
+    }
+  }, [activeIndex, citations, segmentDetails]);
+
+  const handleExpand = useCallback(async (idx: number, ref: SourceRef) => {
+    if (expandedIdx === idx) {
+      setExpandedIdx(null);
+      return;
+    }
+    setExpandedIdx(idx);
+
+    // If already fetched segment detail, just expand
+    if (segmentDetails.has(idx)) return;
+
+    // Fetch segment detail from API
+    if (ref.dify_document_id && ref.chunk_id) {
+      setLoadingIdx(idx);
+      try {
+        const detail = await difySegments.get(ref.dify_document_id, ref.chunk_id);
+        setSegmentDetails((prev) => {
+          const next = new Map(prev);
+          next.set(idx, detail as SegmentDetail);
+          return next;
+        });
+      } catch {
+        // Silent fail - show no detail
+      } finally {
+        setLoadingIdx(null);
+      }
+    }
+  }, [expandedIdx, segmentDetails]);
 
   return (
     <>
@@ -115,74 +168,116 @@ export default function CitationPanel({ citations, isOpen, onToggle, activeIndex
             </div>
           ) : (
             citations.map((ref, i) => (
-              <div
-                key={i}
-                data-citation-idx={i}
-                className="citation-card"
-                style={{
-                  padding: "10px 12px",
-                  marginBottom: 6,
-                  background: activeIndex === i ? "#f0edff" : "#fff",
-                  borderRadius: 8,
-                  border: activeIndex === i ? "1px solid #d4ccf5" : "1px solid #eee",
-                  fontSize: 12,
-                  lineHeight: 1.5,
-                  transition: "background 0.15s, border-color 0.15s",
-                }}
-              >
+              <div key={i}>
                 <div
+                  data-citation-idx={i}
+                  className="citation-card"
+                  onClick={() => handleExpand(i, ref)}
                   style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    marginBottom: 4,
+                    padding: "10px 12px",
+                    marginBottom: expandedIdx === i ? 0 : 6,
+                    background: activeIndex === i ? "#f0edff" : "#fff",
+                    borderRadius: expandedIdx === i ? "8px 8px 0 0" : 8,
+                    border: activeIndex === i ? "1px solid #d4ccf5" : "1px solid #eee",
+                    borderBottom: expandedIdx === i ? "none" : "1px solid #eee",
+                    fontSize: 12,
+                    lineHeight: 1.5,
+                    cursor: "pointer",
+                    transition: "background 0.15s, border-color 0.15s",
                   }}
                 >
-                  <span
-                    style={{
-                      width: 18,
-                      height: 18,
-                      borderRadius: "50%",
-                      background: "#6c5ce7",
-                      color: "#fff",
-                      fontSize: 10,
-                      fontWeight: 600,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      flexShrink: 0,
-                    }}
-                  >
-                    {ref.ordinal}
-                  </span>
-                  <span
-                    style={{
-                      fontWeight: 500,
-                      color: "#333",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
-                    title={ref.source_name}
-                  >
-                    {ref.source_name}
-                  </span>
-                </div>
-                {ref.snippet && (
                   <div
                     style={{
-                      color: "#888",
-                      fontSize: 11,
-                      marginTop: 2,
-                      paddingLeft: 26,
-                      lineHeight: 1.5,
-                      display: "-webkit-box",
-                      WebkitLineClamp: 3,
-                      WebkitBoxOrient: "vertical",
-                      overflow: "hidden",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      marginBottom: 4,
                     }}
                   >
-                    {ref.snippet}
+                    <span
+                      style={{
+                        width: 18,
+                        height: 18,
+                        borderRadius: "50%",
+                        background: "#6c5ce7",
+                        color: "#fff",
+                        fontSize: 10,
+                        fontWeight: 600,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
+                      }}
+                    >
+                      {ref.ordinal}
+                    </span>
+                    <span
+                      style={{
+                        fontWeight: 500,
+                        color: "#333",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                        flex: 1,
+                      }}
+                      title={ref.source_name}
+                    >
+                      {ref.source_name}
+                    </span>
+                    {loadingIdx === i ? (
+                      <Loader2 size={12} color="#888" style={{ animation: "spin 1s linear infinite" }} />
+                    ) : (
+                      expandedIdx === i ? <ChevronUp size={12} color="#888" /> : <ChevronDown size={12} color="#888" />
+                    )}
+                  </div>
+                  {ref.snippet && expandedIdx !== i && (
+                    <div
+                      style={{
+                        color: "#888",
+                        fontSize: 11,
+                        marginTop: 2,
+                        paddingLeft: 26,
+                        lineHeight: 1.5,
+                        display: "-webkit-box",
+                        WebkitLineClamp: 3,
+                        WebkitBoxOrient: "vertical",
+                        overflow: "hidden",
+                      }}
+                    >
+                      {ref.snippet}
+                    </div>
+                  )}
+                </div>
+
+                {/* Expanded detail panel */}
+                {expandedIdx === i && (
+                  <div
+                    style={{
+                      padding: "10px 12px",
+                      marginBottom: 6,
+                      background: "#fff",
+                      border: "1px solid #d4ccf5",
+                      borderTop: "none",
+                      borderRadius: "0 0 8px 8px",
+                      fontSize: 12,
+                      lineHeight: 1.6,
+                      color: "#444",
+                    }}
+                  >
+                    {loadingIdx === i ? (
+                      <div style={{ textAlign: "center", padding: "12px 0", color: "#999" }}>
+                        <Loader2 size={16} style={{ animation: "spin 1s linear infinite", marginBottom: 4 }} />
+                        <div>加载中...</div>
+                      </div>
+                    ) : segmentDetails.has(i) ? (
+                      <div>
+                        {segmentDetails.get(i)?.content || "暂无内容"}
+                      </div>
+                    ) : (
+                      <div style={{ color: "#999", fontStyle: "italic" }}>
+                        暂无分段详情
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

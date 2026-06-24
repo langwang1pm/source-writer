@@ -16,6 +16,7 @@ from app.api.uploaded_files import router as uploaded_file_router
 from app.api.response_docs import router as response_doc_router
 from app.api.message_blocks import router as message_block_router
 from app.api.source_refs import router as source_ref_router
+from app.api.dify_segments import router as dify_segments_router
 
 _sync_task: asyncio.Task | None = None
 
@@ -90,6 +91,7 @@ app.include_router(uploaded_file_router)
 app.include_router(response_doc_router)
 app.include_router(message_block_router)
 app.include_router(source_ref_router)
+app.include_router(dify_segments_router)
 
 
 @app.get("/health")

@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
 import { Bot, User, ChevronDown, ChevronUp, Sparkles, Download, FileText, ExternalLink } from "lucide-react";
 import { responseDocs } from "../../api/client";
-import type { MessageBlock, ResponseDoc } from "../../types";
+import type { MessageBlock, ResponseDoc, SourceRef } from "../../types";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
@@ -13,11 +13,12 @@ interface Props {
   streamingCard?: number | null;
   streamPhase?: "idle" | "waiting" | "thinking" | "answering";
   responseDoc?: ResponseDoc | null;
-  onCitationClick?: (sourceName: string) => void;
+  onCitationClick?: (ordinal: number, cardOrdinal: number) => void;
   workspaceId?: string;
+  citationRefs?: SourceRef[];
 }
 
-export default function MessageCard({ role, content, blocks, streamingCard, streamPhase, responseDoc, onCitationClick, workspaceId }: Props) {
+export default function MessageCard({ role, content, blocks, streamingCard, streamPhase, responseDoc, onCitationClick, workspaceId, citationRefs }: Props) {
   if (role === "user") {
     return (
       <div style={{ display: "flex", gap: 10, padding: "16px 20px", justifyContent: "flex-end" }}>
@@ -70,12 +71,14 @@ export default function MessageCard({ role, content, blocks, streamingCard, stre
           <CardItem
             key={cardOrdinal}
             card={cards.get(cardOrdinal)!}
+            cardOrdinal={cardOrdinal}
             isStreaming={streamingCard === cardOrdinal}
             streamPhase={streamPhase}
             isLastCard={cardOrdinal === cardKeys[cardKeys.length - 1]}
             responseDoc={responseDoc}
             onCitationClick={onCitationClick}
             workspaceId={workspaceId}
+            citationRefs={citationRefs}
           />
         ))}
       </div>
@@ -83,14 +86,16 @@ export default function MessageCard({ role, content, blocks, streamingCard, stre
   );
 }
 
-function CardItem({ card, isStreaming, streamPhase, isLastCard, responseDoc, onCitationClick, workspaceId }: {
+function CardItem({ card, isStreaming, streamPhase, isLastCard, responseDoc, onCitationClick, workspaceId, citationRefs, cardOrdinal }: {
   card: { think: string; answer: string };
   isStreaming: boolean;
   streamPhase?: "idle" | "waiting" | "thinking" | "answering";
   isLastCard: boolean;
   responseDoc?: ResponseDoc | null;
-  onCitationClick?: (sourceName: string) => void;
+  onCitationClick?: (ordinal: number, cardOrdinal: number) => void;
   workspaceId?: string;
+  citationRefs?: SourceRef[];
+  cardOrdinal?: number;
 }) {
   const [thinkingCollapsed, setThinkingCollapsed] = useState(true);
   const hasThink = card.think.length > 0;
@@ -105,28 +110,61 @@ function CardItem({ card, isStreaming, streamPhase, isLastCard, responseDoc, onC
     }
   }, [streamPhase, isStreaming]);
 
-  // Pre-process answer content to make citation markers clickable
+  // Build lookup: docId~~~chunkId -> ordinal (filtered by cardOrdinal)
+  const ordinalMap = useMemo(() => {
+    const map = new Map<string, { ordinal: number; difyDocumentId: string; chunkId: string }>();
+    const refs = (citationRefs || []).filter(r => cardOrdinal == null || r.card_ordinal === cardOrdinal);
+    for (const ref of refs) {
+      if (ref.dify_document_id && ref.chunk_id) {
+        const key = ref.dify_document_id + "~~~" + ref.chunk_id;
+        if (!map.has(key)) {
+          map.set(key, { ordinal: ref.ordinal, difyDocumentId: ref.dify_document_id, chunkId: ref.chunk_id });
+        }
+      }
+    }
+    return map;
+  }, [citationRefs, cardOrdinal]);
+
+  const PAIR_PATTERN = /([0-9a-fA-F\-]+)~~~([0-9a-fA-F\-]+)/g;
+
+  // Pre-process answer: replace citation markers with clickable [n] badges
   const processedAnswer = useMemo(() => {
     if (!card.answer) return card.answer;
     return card.answer.replace(
       /【引用来源[：:]\s*([^】]+)】/g,
-      (match, sourceName) =>
-        `<span class="citation-ref" data-source="${sourceName.replace(/"/g, '&quot;')}" style="cursor:pointer;color:#6c5ce7;font-weight:500;border-bottom:1px dashed #d4ccf5;">${match}</span>`
+      (match, sourceText) => {
+        const entries: { ordinal: number; difyDocumentId: string; chunkId: string }[] = [];
+        let pairMatch;
+        PAIR_PATTERN.lastIndex = 0;
+        while ((pairMatch = PAIR_PATTERN.exec(sourceText)) !== null) {
+          const key = pairMatch[1] + "~~~" + pairMatch[2];
+          const info = ordinalMap.get(key);
+          if (info && !entries.find(e => e.ordinal === info.ordinal)) {
+            entries.push(info);
+          }
+        }
+        if (entries.length === 0) return match;
+        const badges = entries.map(
+          (e) =>
+            `<span class="citation-ref" data-ordinal="${e.ordinal}" data-doc-id="${e.difyDocumentId}" data-chunk-id="${e.chunkId}" style="cursor:pointer;color:#6c5ce7;font-weight:600;font-size:12px;background:#f0edff;padding:0 5px;border-radius:3px;margin:0 1px;">[${e.ordinal}]</span>`
+        ).join('');
+        return `【引用来源：${badges}】`;
+      }
     );
-  }, [card.answer]);
+  }, [card.answer, ordinalMap]);
 
   const handleAnswerClick = useCallback((e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
     const citationSpan = target.closest('.citation-ref');
     if (citationSpan) {
-      const sourceName = citationSpan.getAttribute('data-source');
-      if (sourceName && onCitationClick) {
+      const ordinalStr = citationSpan.getAttribute('data-ordinal');
+      if (ordinalStr && onCitationClick) {
         e.preventDefault();
         e.stopPropagation();
-        onCitationClick(sourceName);
+        onCitationClick(parseInt(ordinalStr, 10), cardOrdinal ?? 0);
       }
     }
-  }, [onCitationClick]);
+  }, [onCitationClick, cardOrdinal]);
 
 
   return (
@@ -195,10 +233,10 @@ function CardItem({ card, isStreaming, streamPhase, isLastCard, responseDoc, onC
 
       {/* Answer section */}
       {(hasAnswer || (isStreaming && streamPhase === "answering")) && (
-        <div style={{ padding: "14px 16px", background: "#fff" }}>
+        <div onClick={handleAnswerClick} style={{ padding: "14px 16px", background: "#fff" }}>
           {hasAnswer ? (
             <div className="markdown-body" style={{ fontSize: 14, lineHeight: 1.7, color: "#222" }}>
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{card.answer}</ReactMarkdown>
+              <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{processedAnswer}</ReactMarkdown>
             </div>
           ) : (
             <div style={{ display: "flex", gap: 3, alignItems: "center", minHeight: 20 }}>
