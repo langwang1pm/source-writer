@@ -36,7 +36,6 @@ async def create_session(body: SessionCreate, db: AsyncSession = Depends(get_db)
     db.add(session)
     await db.commit()
     from sqlalchemy.orm import selectinload
-    from sqlalchemy import select
     result = await db.execute(
         select(Session).options(selectinload(Session.task_type)).where(Session.id == session.id)
     )
@@ -105,7 +104,6 @@ async def update_session(
         session.title = body.title
     await db.commit()
     from sqlalchemy.orm import selectinload
-    from sqlalchemy import select
     result = await db.execute(
         select(Session).options(selectinload(Session.task_type)).where(Session.id == session.id)
     )

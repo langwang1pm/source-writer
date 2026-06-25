@@ -44,10 +44,18 @@ export default function MainLayout() {
     setEditTitle(s.title || "");
   };
 
-  const handleRenameSave = async (id: string) => {
-    if (!editTitle.trim()) return;
-    await sessions.update(id, { title: editTitle.trim() });
-    setSessionList((prev) => prev.map((s) => (s.id === id ? { ...s, title: editTitle.trim() } : s)));
+  const handleRenameSave = async (id: string, title: string) => {
+    const trimmed = title.trim();
+    if (!trimmed) {
+      setEditingSessionId(null);
+      return;
+    }
+    try {
+      await sessions.update(id, { title: trimmed });
+      setSessionList((prev) => prev.map((s) => (s.id === id ? { ...s, title: trimmed } : s)));
+    } catch {
+      // Revert to display mode even if the API call failed
+    }
     setEditingSessionId(null);
   };
 
@@ -128,10 +136,10 @@ export default function MainLayout() {
                   value={editTitle}
                   onChange={(e) => setEditTitle(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") handleRenameSave(s.id);
+                    if (e.key === "Enter") handleRenameSave(s.id, editTitle);
                     if (e.key === "Escape") setEditingSessionId(null);
                   }}
-                  onBlur={() => handleRenameSave(s.id)}
+                  onBlur={() => handleRenameSave(s.id, editTitle)}
                   autoFocus
                   style={{
                     flex: 1, margin: "6px 8px", padding: "4px 8px", borderRadius: 4,
