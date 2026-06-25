@@ -33,8 +33,14 @@ export default function ChatPage() {
   const [sessionTaskType, setSessionTaskType] = useState<string>("");
 
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const chatScrollRef = useRef<HTMLDivElement>(null);
   const thinkBufRef = useRef("");
   const insideThinkRef = useRef(false);
+  const autoScrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prevWasScrollingRef = useRef(false);
+  const isStreamingRef = useRef(false);
+  const [autoScrollEnabled, setAutoScrollEnabled] = useState(true);
+  const [isUserScrolling, setIsUserScrolling] = useState(false);
 
   // Load messages for active session
   useEffect(() => {
@@ -286,6 +292,17 @@ export default function ChatPage() {
   }, [workspaceId, sessionId, isStreaming, startStream]);
 
   const handleCitationClick = useCallback((ordinal: number, cardOrdinal: number) => {
+    // When user clicks a citation, pause auto-scroll so they can read the panel content
+    setAutoScrollEnabled(false);
+    setIsUserScrolling(true);
+    if (autoScrollTimerRef.current) {
+      clearTimeout(autoScrollTimerRef.current);
+    }
+    autoScrollTimerRef.current = setTimeout(() => {
+      setAutoScrollEnabled(true);
+      setIsUserScrolling(false);
+    }, 3000);
+
     // Find ref matching ordinal + card_ordinal
     const idx = citationRefs.findIndex((r) => r.ordinal === ordinal && r.card_ordinal === cardOrdinal);
     if (idx >= 0) {
@@ -294,9 +311,52 @@ export default function ChatPage() {
     }
   }, [citationRefs, showCitation]);
 
+  // Smart auto-scroll: only scroll when autoScrollEnabled is true
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, streamBlocks]);
+    if (autoScrollEnabled) {
+      chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages, streamBlocks, autoScrollEnabled]);
+
+  // Smart auto-scroll: only during active streaming.
+  // Resume 3s after user stops scrolling, but only if still streaming.
+  useEffect(() => {
+    const wasScrolling = prevWasScrollingRef.current;
+    prevWasScrollingRef.current = isUserScrolling;
+
+    if (wasScrolling && !isUserScrolling && isStreamingRef.current) {
+      if (autoScrollTimerRef.current) clearTimeout(autoScrollTimerRef.current);
+      autoScrollTimerRef.current = setTimeout(() => {
+        setAutoScrollEnabled(true);
+      }, 3000);
+    }
+  });
+
+  // Keep isStreamingRef in sync
+  useEffect(() => {
+    isStreamingRef.current = isStreaming;
+    if (!isStreaming) {
+      // Streaming ended: turn off auto-scroll entirely. User controls scroll freely.
+      if (autoScrollTimerRef.current) clearTimeout(autoScrollTimerRef.current);
+      setAutoScrollEnabled(false);
+      setIsUserScrolling(false);
+      
+      // Dispatch custom event to refresh session list (for auto-renaming new sessions)
+      window.dispatchEvent(new CustomEvent('session-renamed', { detail: { sessionId } }));
+    }
+  }, [isStreaming, sessionId]);
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (autoScrollTimerRef.current) clearTimeout(autoScrollTimerRef.current);
+    };
+  }, []);
+
+  const handleUserScrollStart = useCallback(() => {
+    setAutoScrollEnabled(false);
+    setIsUserScrolling(true);
+  }, []);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", flex: 1, overflow: "hidden" }}>
@@ -345,7 +405,13 @@ export default function ChatPage() {
               </div>
             )}
             <div style={{ display: "flex", flex: 1, overflow: "hidden", position: "relative" }}>
-              <div style={{ flex: 1, overflow: "auto", background: "#f5f5f7" }}>
+              <div
+                ref={chatScrollRef}
+                style={{ flex: 1, overflow: "auto", background: "#f5f5f7" }}
+                onMouseDown={handleUserScrollStart}
+                onWheel={handleUserScrollStart}
+                onMouseLeave={() => setIsUserScrolling(false)}
+              >
               {messages.map((msg) => (
                 <MessageCard key={msg.id} role={msg.role} content={msg.content} blocks={msg.blocks} responseDoc={msg.responseDoc} onCitationClick={handleCitationClick} workspaceId={workspaceId} citationRefs={citationRefs} />
               ))}

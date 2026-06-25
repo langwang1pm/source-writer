@@ -101,6 +101,7 @@ function CardItem({ card, isStreaming, streamPhase, isLastCard, responseDoc, onC
   const hasThink = card.think.length > 0;
   const hasAnswer = card.answer.length > 0;
   const hasAutoExpanded = useRef(false);
+  const hasAutoCollapsed = useRef(false);
 
   // Auto-expand thinking section ONCE when think content first arrives
   useEffect(() => {
@@ -109,15 +110,17 @@ function CardItem({ card, isStreaming, streamPhase, isLastCard, responseDoc, onC
       hasAutoExpanded.current = true;
       setThinkingCollapsed(false);
     }
-  }, [card.think.length, isStreaming, thinkingCollapsed]);
+  }, [card.think.length, isStreaming]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Auto-collapse thinking section when answer content arrives
+  // Auto-collapse thinking section ONCE when answer content first arrives.
+  // After that, user has full control over expand/collapse.
   useEffect(() => {
-    if (!isStreaming) return;
-    if (card.answer.length > 0 && !thinkingCollapsed && card.think.length > 0) {
+    if (!isStreaming || hasAutoCollapsed.current) return;
+    if (card.answer.length > 0 && card.think.length > 0) {
+      hasAutoCollapsed.current = true;
       setThinkingCollapsed(true);
     }
-  }, [card.answer.length, isStreaming, thinkingCollapsed, card.think.length]);
+  }, [card.answer.length, isStreaming, card.think.length]);
 
   // Build lookup: docId~~~chunkId -> ordinal (filtered by cardOrdinal)
   const ordinalMap = useMemo(() => {

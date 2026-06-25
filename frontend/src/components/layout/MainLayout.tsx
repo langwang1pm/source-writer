@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Outlet, useParams, useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { MessageSquare, Plus, FolderOpen, LogOut, X, Pencil, Trash2 } from "lucide-react";
 import { sessions, workspaces, taskTypes } from "../../api/client";
@@ -22,13 +22,27 @@ export default function MainLayout() {
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
 
-  useEffect(() => {
+  // Load session list
+  const loadSessions = useCallback(() => {
     if (!workspaceId) return;
     setLoading(true);
     sessions.list({ workspace_id: workspaceId }).then((res) => {
       setSessionList(res.items || []);
     }).finally(() => setLoading(false));
   }, [workspaceId]);
+
+  useEffect(() => {
+    loadSessions();
+  }, [loadSessions]);
+
+  // Listen for session rename event (from ChatPage after streaming ends)
+  useEffect(() => {
+    const handleSessionRenamed = () => {
+      loadSessions();
+    };
+    window.addEventListener('session-renamed', handleSessionRenamed);
+    return () => window.removeEventListener('session-renamed', handleSessionRenamed);
+  }, [loadSessions]);
 
   useEffect(() => {
     if (!workspaceId) return;
