@@ -68,8 +68,9 @@ export default function ChatPage() {
       const docs: ResponseDoc[] = docsRes.items || [];
 
       // Load source refs for citations panel (from latest response doc)
-      let latestDocId: string | null = null;
- 
+      // docs is sorted by created_at.desc(), so the first one is the latest
+      const latestDocId = docs.length > 0 ? docs[0].id : null;
+
       for (const msg of (res.items || []) as ChatMessage[]) {
         msgList.push({ id: msg.id, role: "user", content: msg.content });
 
@@ -77,9 +78,6 @@ export default function ChatPage() {
         const blocks: MessageBlock[] = blocksRes || [];
 
         const doc = docs.find((d) => d.chat_message_id === msg.id);
-        if (doc && !latestDocId) {
-          latestDocId = doc.id;
-        }
 
         msgList.push({
           id: `resp-${msg.id}`,
